@@ -1,3 +1,5 @@
+const MAX_GROUP_CALL_PARTICIPANTS = 5;
+
 const groupCallParticipants = new Map<
     string,
     Set<string>
@@ -8,10 +10,12 @@ export function joinGroupCall(
     userId: string
 ) {
     let participants =
-        groupCallParticipants.get(conversationId);
+        groupCallParticipants.get(
+            conversationId
+        );
 
     if (!participants) {
-        participants = new Set();
+        participants = new Set<string>();
 
         groupCallParticipants.set(
             conversationId,
@@ -27,7 +31,9 @@ export function leaveGroupCall(
     userId: string
 ) {
     const participants =
-        groupCallParticipants.get(conversationId);
+        groupCallParticipants.get(
+            conversationId
+        );
 
     if (!participants) {
         return;
@@ -46,15 +52,23 @@ export function getGroupCallParticipants(
     conversationId: string
 ) {
     return Array.from(
-        groupCallParticipants.get(conversationId) ?? []
+        groupCallParticipants.get(
+            conversationId
+        ) ?? []
     );
 }
 
 export function isGroupCallFull(
     conversationId: string
 ) {
+    const participants =
+        groupCallParticipants.get(
+            conversationId
+        );
+
     return (
-        getGroupCallParticipants(conversationId).length >= 5
+        (participants?.size ?? 0) >=
+        MAX_GROUP_CALL_PARTICIPANTS
     );
 }
 
@@ -63,9 +77,16 @@ export function getGroupCallsForUser(
 ) {
     const conversationIds: string[] = [];
 
-    for (const [conversationId, participants] of groupCallParticipants) {
-        if (participants.has(userId)) {
-            conversationIds.push(conversationId);
+    for (const [
+        conversationId,
+        participants,
+    ] of groupCallParticipants) {
+        if (
+            participants.has(userId)
+        ) {
+            conversationIds.push(
+                conversationId
+            );
         }
     }
 

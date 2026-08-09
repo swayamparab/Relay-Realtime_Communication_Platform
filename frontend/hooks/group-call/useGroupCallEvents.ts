@@ -14,12 +14,40 @@ type Props = {
     }) => void;
 
     onCallEnded: () => void;
+
+    onOffer: (data: {
+        senderId: string;
+        conversationId: string;
+        offer: RTCSessionDescriptionInit;
+    }) => void;
+
+    onAnswer: (data: {
+        senderId: string;
+        conversationId: string;
+        answer: RTCSessionDescriptionInit;
+    }) => void;
+
+    onIceCandidate: (data: {
+        senderId: string;
+        conversationId: string;
+        candidate: RTCIceCandidateInit;
+    }) => void;
+
+    onIncomingCall: (data: {
+        conversationId: string;
+        callerId: string;
+        type: "voice" | "video";
+    }) => void;
 };
 
 export function useGroupCallEvents({
     onUserJoined,
     onUserLeft,
     onCallEnded,
+    onOffer,
+    onAnswer,
+    onIceCandidate,
+    onIncomingCall
 }: Props) {
     const { socket } = useSocket();
 
@@ -39,6 +67,26 @@ export function useGroupCallEvents({
             onCallEnded
         );
 
+        socket.on(
+            "group_call:offer",
+            onOffer
+        );
+
+        socket.on(
+            "group_call:answer",
+            onAnswer
+        );
+
+        socket.on(
+            "group_call:ice_candidate",
+            onIceCandidate
+        );
+
+        socket.on(
+            "group_call:incoming",
+            onIncomingCall
+        );
+
         return () => {
             socket.off(
                 "group_call:user_joined",
@@ -54,11 +102,35 @@ export function useGroupCallEvents({
                 "group_call:ended",
                 onCallEnded
             );
+
+            socket.off(
+                "group_call:offer",
+                onOffer
+            );
+
+            socket.off(
+                "group_call:answer",
+                onAnswer
+            );
+
+            socket.off(
+                "group_call:ice_candidate",
+                onIceCandidate
+            );
+
+            socket.off(
+                "group_call:incoming",
+                onIncomingCall
+            );
         };
     }, [
         socket,
         onUserJoined,
         onUserLeft,
         onCallEnded,
+        onOffer,
+        onAnswer,
+        onIceCandidate,
+        onIncomingCall
     ]);
 }

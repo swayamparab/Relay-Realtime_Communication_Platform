@@ -11,7 +11,7 @@ import { eq } from "drizzle-orm";
 import { activeCalls } from "../helpers/active-calls";
 import { registerGroupCallEvents } from "./group-call.event";
 import { getGroupCallParticipants, getGroupCallsForUser, leaveGroupCall } from "../helpers/group-call-state";
-import { endGroupCall } from "../../services/group-call.service";
+import { endGroupCall, getActiveGroupCallsForUser } from "../../services/group-call.service";
 
 export function handleConnection(io: Server, socket: Socket) {
   // console.log(`User ${socket.userId} connected`);
@@ -47,43 +47,65 @@ export function handleConnection(io: Server, socket: Socket) {
 
   //offline status as user disconnects
   socket.on("disconnect", async () => {
+    const userActiveCalls =
+      await getActiveGroupCallsForUser(
+        socket.userId
+      );
 
-    onlineUsers.delete(socket.userId);
-    activeCalls.delete(socket.userId);
+    for (const call of userActiveCalls) {
+      leaveGroupCall(
+        call.conversationId,
+        socket.userId
+      );
 
-    const conversationIds = getGroupCallsForUser(socket.userId);
-    for (const conversationId of conversationIds) {
+      const remainingParticipants =
+        getGroupCallParticipants(
+          call.conversationId
+        );
 
-      leaveGroupCall(conversationId, socket.userId);
+      io.to(
+        `group-call:${call.conversationId}`
+      ).emit(
+        "group_call:user_left",
+        {
+          userId: socket.userId,
+        }
+      );
 
-      socket.leave(`group-call:${conversationId}`);
+      if (
+        remainingParticipants.length === 0
+      ) {
+        await endGroupCall(
+          call.conversationId
+        );
 
-      io.to(`group-call:${conversationId}`).emit("group_call:user_left", {
-        userId: socket.userId,
-      });
-
-      if (getGroupCallParticipants(conversationId).length === 0) {
-        await endGroupCall(conversationId);
-
-        io.to(`group-call:${conversationId}`).emit("group_call:ended",
+        io.to(
+          `group-call:${call.conversationId}`
+        ).emit(
+          "group_call:ended",
           {
-            conversationId,
+            conversationId:
+              call.conversationId,
           }
         );
       }
     }
+
+    // Existing one-to-one call cleanup
+    onlineUsers.delete(socket.userId);
+    activeCalls.delete(socket.userId);
 
     await db
       .update(users)
       .set({
         lastSeen: new Date(),
       })
-      .where(eq(users.id, socket.userId));
+      .where(
+        eq(users.id, socket.userId)
+      );
 
     io.emit("user_offline", {
       userId: socket.userId,
     });
-
-    // console.log(`User ${socket.userId} disconnected`);
   });
 }

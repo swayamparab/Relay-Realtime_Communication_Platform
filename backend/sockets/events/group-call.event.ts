@@ -1,8 +1,8 @@
 import { Server, Socket } from "socket.io";
 
 import {
-    isParticipant,
     getConversationParticipantIds,
+    isParticipant,
 } from "../../modules/conversation/conversation.service";
 
 import {
@@ -18,218 +18,371 @@ import {
     getActiveGroupCall,
 } from "../../services/group-call.service";
 
-export function registerGroupCallEvents(io: Server, socket: Socket) {
+export function registerGroupCallEvents(
+    io: Server,
+    socket: Socket
+) {
 
-    socket.on("group_call:start", async ({ conversationId }, callback) => {
-        try {
-            const allowed = await isParticipant(
-                socket.userId,
-                conversationId
-            );
+    socket.on(
+        "group_call:start",
+        async (
+            {
+                conversationId,
+                type,
+            }: {
+                conversationId: string;
+                type: "voice" | "video";
+            },
+            callback
+        ) => {
+            try {
+                const allowed =
+                    await isParticipant(
+                        socket.userId,
+                        conversationId
+                    );
 
-            if (!allowed) {
-                return callback?.({
-                    success: false,
-                    message: "Unauthorized",
+                if (!allowed) {
+                    return callback?.({
+                        success: false,
+                        message: "Unauthorized",
+                    });
+                }
+
+                const existingCall =
+                    await getActiveGroupCall(
+                        conversationId
+                    );
+
+                if (existingCall) {
+                    return callback?.({
+                        success: false,
+                        message:
+                            "A group call is already active.",
+                    });
+                }
+
+                if (
+                    isGroupCallFull(
+                        conversationId
+                    )
+                ) {
+                    return callback?.({
+                        success: false,
+                        message:
+                            "Group call is full.",
+                    });
+                }
+
+                const groupCall =
+                    await createGroupCall(
+                        conversationId,
+                        socket.userId,
+                        type
+                    );
+
+                joinGroupCall(
+                    conversationId,
+                    socket.userId
+                );
+
+                socket.join(
+                    `group-call:${conversationId}`
+                );
+
+                socket.to(conversationId).emit(
+                    "group_call:incoming",
+                    {
+                        conversationId,
+                        callerId: socket.userId,
+                        type,
+                    });
+
+                callback?.({
+                    success: true,
+                    type: groupCall.type,
+                    participants:
+                        getGroupCallParticipants(
+                            conversationId
+                        ),
                 });
-            }
-
-            if (isGroupCallFull(conversationId)) {
-                return callback?.({
+            } catch (error) {
+                callback?.({
                     success: false,
                     message:
-                        "Group call is full.",
+                        error instanceof Error
+                            ? error.message
+                            : "Internal Server Error",
                 });
             }
+        }
+    );
 
-            joinGroupCall(
+    socket.on(
+        "group_call:join",
+        async (
+            {
                 conversationId,
-                socket.userId
-            );
-
-            socket.join(
-                `group-call:${conversationId}`
-            );
-
-            callback?.({
-                success: true,
-                participants:
-                    getGroupCallParticipants(
+            }: {
+                conversationId: string;
+            },
+            callback
+        ) => {
+            try {
+                const allowed =
+                    await isParticipant(
+                        socket.userId,
                         conversationId
-                    ),
-            });
-        } catch (error) {
-            callback?.({
-                success: false,
-                message:
-                    error instanceof Error
-                        ? error.message
-                        : "Internal Server Error",
-            });
-        }
-    });
+                    );
 
-    socket.on("group_call:join", async ({ conversationId }, callback) => {
-        try {
-            const allowed = await isParticipant(
-                socket.userId,
-                conversationId
-            );
-
-            if (!allowed) {
-                return callback?.({
-                    success: false,
-                    message: "Unauthorized",
-                });
-            }
-
-            if (isGroupCallFull(conversationId)) {
-                return callback?.({
-                    success: false,
-                    message: "Group call is full.",
-                });
-            }
-
-            joinGroupCall(
-                conversationId,
-                socket.userId
-            );
-
-            socket.join(`group-call:${conversationId}`);
-
-            io.to(`group-call:${conversationId}`).emit(
-                "group_call:user_joined",
-                {
-                    userId: socket.userId,
+                if (!allowed) {
+                    return callback?.({
+                        success: false,
+                        message: "Unauthorized",
+                    });
                 }
-            );
 
-            callback?.({
-                success: true,
-                participants:
-                    getGroupCallParticipants(
+                const activeCall =
+                    await getActiveGroupCall(
                         conversationId
-                    ),
-            });
-        } catch (error) {
-            callback?.({
-                success: false,
-                message:
-                    error instanceof Error
-                        ? error.message
-                        : "Internal Server Error",
-            });
-        }
-    });
+                    );
 
-    socket.on("group_call:end", async ({ conversationId }, callback) => {
-        try {
-            const allowed = await isParticipant(
-                socket.userId,
-                conversationId
-            );
-
-            if (!allowed) {
-                return callback?.({
-                    success: false,
-                    message: "Unauthorized",
-                });
-            }
-
-            await endGroupCall(conversationId);
-
-            const participants =
-                getGroupCallParticipants(
-                    conversationId
-                );
-
-            participants.forEach((userId) => {
-                leaveGroupCall(
-                    conversationId,
-                    userId
-                );
-            });
-
-            io.to(`group-call:${conversationId}`).emit(
-                "group_call:ended",
-                {
-                    conversationId,
+                if (!activeCall) {
+                    return callback?.({
+                        success: false,
+                        message:
+                            "No active group call.",
+                    });
                 }
-            );
 
-            callback?.({
-                success: true,
-            });
-        } catch (error) {
-            callback?.({
-                success: false,
-                message:
-                    error instanceof Error
-                        ? error.message
-                        : "Internal Server Error",
-            });
-        }
-    });
+                if (
+                    isGroupCallFull(
+                        conversationId
+                    )
+                ) {
+                    return callback?.({
+                        success: false,
+                        message:
+                            "Group call is full.",
+                    });
+                }
 
-    socket.on("group_call:leave", async ({ conversationId }, callback) => {
-        try {
-            const allowed = await isParticipant(
-                socket.userId,
-                conversationId
-            );
+                joinGroupCall(
+                    conversationId,
+                    socket.userId
+                );
 
-            if (!allowed) {
-                return callback?.({
+                socket.join(
+                    `group-call:${conversationId}`
+                );
+
+                socket.to(
+                    `group-call:${conversationId}`
+                ).emit(
+                    "group_call:user_joined",
+                    {
+                        userId: socket.userId,
+                    }
+                );
+
+                callback?.({
+                    success: true,
+                    participants:
+                        getGroupCallParticipants(
+                            conversationId
+                        ),
+                    type: activeCall.type,
+                });
+            } catch (error) {
+                callback?.({
                     success: false,
-                    message: "Unauthorized",
+                    message:
+                        error instanceof Error
+                            ? error.message
+                            : "Internal Server Error",
                 });
             }
+        }
+    );
 
-            leaveGroupCall(
+    socket.on(
+        "group_call:end",
+        async (
+            {
                 conversationId,
-                socket.userId
-            );
+            }: {
+                conversationId: string;
+            },
+            callback
+        ) => {
+            try {
+                const allowed =
+                    await isParticipant(
+                        socket.userId,
+                        conversationId
+                    );
 
-            socket.leave(
-                `group-call:${conversationId}`
-            );
-
-            io.to(`group-call:${conversationId}`).emit(
-                "group_call:user_left",
-                {
-                    userId: socket.userId,
+                if (!allowed) {
+                    return callback?.({
+                        success: false,
+                        message: "Unauthorized",
+                    });
                 }
-            );
 
-            const participants =
-                getGroupCallParticipants(
-                    conversationId
-                );
+                const activeCall =
+                    await getActiveGroupCall(
+                        conversationId
+                    );
 
-            if (participants.length === 0) {
+                if (!activeCall) {
+                    return callback?.({
+                        success: false,
+                        message:
+                            "No active group call.",
+                    });
+                }
+
                 await endGroupCall(
                     conversationId
                 );
 
-                io.to(`group-call:${conversationId}`).emit(
+                const participants =
+                    getGroupCallParticipants(
+                        conversationId
+                    );
+
+                // Remove everyone from in-memory
+                // group-call state.
+                participants.forEach((userId) => {
+                    leaveGroupCall(
+                        conversationId,
+                        userId
+                    );
+                });
+
+                // Notify everyone currently in the call.
+                io.to(
+                    `group-call:${conversationId}`
+                ).emit(
                     "group_call:ended",
                     {
                         conversationId,
                     }
                 );
-            }
 
-            callback?.({
-                success: true,
-            });
-        } catch (error) {
-            callback?.({
-                success: false,
-                message:
-                    error instanceof Error
-                        ? error.message
-                        : "Internal Server Error",
-            });
+                // Remove this socket from the room.
+                socket.leave(
+                    `group-call:${conversationId}`
+                );
+
+                callback?.({
+                    success: true,
+                });
+            } catch (error) {
+                callback?.({
+                    success: false,
+                    message:
+                        error instanceof Error
+                            ? error.message
+                            : "Internal Server Error",
+                });
+            }
         }
-    });
-}   
+    );
+
+    socket.on(
+        "group_call:leave",
+        async (
+            {
+                conversationId,
+            }: {
+                conversationId: string;
+            },
+            callback
+        ) => {
+            try {
+                const allowed =
+                    await isParticipant(
+                        socket.userId,
+                        conversationId
+                    );
+
+                if (!allowed) {
+                    return callback?.({
+                        success: false,
+                        message: "Unauthorized",
+                    });
+                }
+
+                const activeCall =
+                    await getActiveGroupCall(
+                        conversationId
+                    );
+
+                if (!activeCall) {
+                    return callback?.({
+                        success: false,
+                        message:
+                            "No active group call.",
+                    });
+                }
+
+                // Remove user from in-memory call state
+                leaveGroupCall(
+                    conversationId,
+                    socket.userId
+                );
+
+                // Remove socket from the call room
+                socket.leave(
+                    `group-call:${conversationId}`
+                );
+
+                // Tell remaining participants
+                io.to(
+                    `group-call:${conversationId}`
+                ).emit(
+                    "group_call:user_left",
+                    {
+                        userId: socket.userId,
+                    }
+                );
+
+                const remainingParticipants =
+                    getGroupCallParticipants(
+                        conversationId
+                    );
+
+                // Last participant left
+                if (
+                    remainingParticipants.length === 0
+                ) {
+                    await endGroupCall(
+                        conversationId
+                    );
+
+                    io.to(
+                        `group-call:${conversationId}`
+                    ).emit(
+                        "group_call:ended",
+                        {
+                            conversationId,
+                        }
+                    );
+                }
+
+                callback?.({
+                    success: true,
+                });
+            } catch (error) {
+                callback?.({
+                    success: false,
+                    message:
+                        error instanceof Error
+                            ? error.message
+                            : "Internal Server Error",
+                });
+            }
+        }
+    );
+}

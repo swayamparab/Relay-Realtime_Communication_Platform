@@ -6,6 +6,15 @@ import {
 
 import { conversations } from "./conversations";
 import { users } from "./users";
+import { pgEnum } from "drizzle-orm/pg-core";
+
+export const callTypeEnum = pgEnum(
+    "call_type",
+    [
+        "voice",
+        "video",
+    ]
+);
 
 export const groupCalls = pgTable("group_calls", {
     id: uuid("id")
@@ -23,6 +32,9 @@ export const groupCalls = pgTable("group_calls", {
         .references(() => users.id, {
             onDelete: "cascade",
         }),
+
+    type: callTypeEnum("type")
+        .notNull(),
 
     createdAt: timestamp("created_at")
         .defaultNow()

@@ -23,6 +23,7 @@ import { useSearchMessages } from "@/hooks/message/useSearchMessages";
 import { useCallActions } from "@/hooks/call/useCallActions";
 import GroupInfoDialog from "../group/GroupInfoDialog";
 import { useGroupInfo } from "@/hooks/group/useGroupInfo";
+import { GroupCallControls } from "@/components/group-call/GroupCallControls";
 
 type ChatHeaderProps = {
     isTyping: boolean;
@@ -386,17 +387,15 @@ export default function ChatHeader({ isTyping, onJumpToMessage }: ChatHeaderProp
                 <div className="flex items-center gap-1">
                     {!isGroup && (
                         <>
+                            {/* 1-to-1 calls */}
                             <button
                                 onClick={() =>
                                     startVoiceCall({
                                         conversationId,
                                         receiver: {
-                                            id: conversation.type === "group"
-                                                ? conversation.conversationId
-                                                : conversation.otherUser!.id,
-                                            username: conversation.type === "group"
-                                                ? conversation.group!.name!
-                                                : conversation.otherUser!.username,
+                                            id: conversation.otherUser!.id,
+                                            username:
+                                                conversation.otherUser!.username,
                                         },
                                     })
                                 }
@@ -423,14 +422,9 @@ export default function ChatHeader({ isTyping, onJumpToMessage }: ChatHeaderProp
                                         conversationId,
                                         receiver: {
                                             id:
-                                                conversation.type === "group"
-                                                    ? conversation.conversationId
-                                                    : conversation.otherUser!.id,
-
+                                                conversation.otherUser!.id,
                                             username:
-                                                conversation.type === "group"
-                                                    ? conversation.group!.name
-                                                    : conversation.otherUser!.username,
+                                                conversation.otherUser!.username,
                                         },
                                     })
                                 }
@@ -452,7 +446,14 @@ export default function ChatHeader({ isTyping, onJumpToMessage }: ChatHeaderProp
                             </button>
                         </>
                     )}
+
+                    {isGroup && (
+                        <GroupCallControls
+                            conversationId={conversation.conversationId}
+                        />
+                    )}
                 </div>
+
 
                 <DropdownMenu>
                     <DropdownMenuTrigger
