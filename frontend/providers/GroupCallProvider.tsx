@@ -104,6 +104,10 @@ export function GroupCallProvider({
         new Map<string, RTCIceCandidateInit[]>()
     );
 
+    const makingOffer = useRef(
+        new Map<string, boolean>()
+    );
+
     const [incomingCall, setIncomingCall] = useState<{
         conversationId: string;
         callerId: string;
@@ -195,12 +199,19 @@ export function GroupCallProvider({
 
                 if (
                     state === "failed" ||
-                    state === "closed" ||
-                    state === "disconnected"
+                    state === "closed"
                 ) {
                     peer.close();
 
                     peerConnections.current.delete(
+                        remoteUserId
+                    );
+
+                    pendingIceCandidates.current.delete(
+                        remoteUserId
+                    );
+
+                    makingOffer.current.delete(
                         remoteUserId
                     );
 
@@ -239,26 +250,40 @@ export function GroupCallProvider({
                     );
             }
 
-            const offer =
-                await peer.createOffer();
+            if (
+                peer.signalingState !==
+                "stable"
+            ) {
+                return;
+            }
 
-            await peer.setLocalDescription(
-                offer
-            );
-
-            console.log(
-                "Creating offer for:",
-                targetUserId
-            );
-
-            socket.emit(
-                "group_call:offer",
-                {
-                    conversationId,
+            try {
+                makingOffer.current.set(
                     targetUserId,
-                    offer,
-                }
-            );
+                    true
+                );
+
+                const offer =
+                    await peer.createOffer();
+
+                await peer.setLocalDescription(
+                    offer
+                );
+
+                socket.emit(
+                    "group_call:offer",
+                    {
+                        conversationId,
+                        targetUserId,
+                        offer,
+                    }
+                );
+            } finally {
+                makingOffer.current.set(
+                    targetUserId,
+                    false
+                );
+            }
         },
         [
             socket,
@@ -284,31 +309,52 @@ export function GroupCallProvider({
                     );
             }
 
+            if (
+                makingOffer.current.get(
+                    senderId
+                )
+            ) {
+                return;
+            }
+
+            if (
+                peer.signalingState !==
+                "stable"
+            ) {
+                return;
+            }
+
             await peer.setRemoteDescription(
                 offer
             );
 
-            const pending = pendingIceCandidates.current.get(
-                senderId
-            ) ?? [];
+            const pending =
+                pendingIceCandidates.current.get(
+                    senderId
+                ) ?? [];
 
             for (const candidate of pending) {
-                await peer.addIceCandidate(candidate);
+                try {
+                    await peer.addIceCandidate(
+                        candidate
+                    );
+                } catch (error) {
+                    console.error(
+                        "Failed to add pending ICE candidate:",
+                        error
+                    );
+                }
             }
 
             pendingIceCandidates.current.delete(
                 senderId
             );
 
-            const answer = await peer.createAnswer();
+            const answer =
+                await peer.createAnswer();
 
             await peer.setLocalDescription(
                 answer
-            );
-
-            console.log(
-                "Received offer from:",
-                senderId
             );
 
             socket.emit(
@@ -432,6 +478,8 @@ export function GroupCallProvider({
 
         pendingIceCandidates.current.clear();
 
+        makingOffer.current.clear();
+
         setConversationId(null);
         setCallType(null);
         setParticipants([]);
@@ -499,12 +547,19 @@ export function GroupCallProvider({
     const onOffer = useCallback(
         async ({
             senderId,
+            conversationId: eventConversationId,
             offer,
         }: {
             senderId: string;
             conversationId: string;
             offer: RTCSessionDescriptionInit;
         }) => {
+            if (
+                eventConversationId !== conversationId
+            ) {
+                return;
+            }
+
             try {
                 await handleOffer(
                     senderId,
@@ -517,18 +572,25 @@ export function GroupCallProvider({
                 );
             }
         },
-        [handleOffer]
+        [conversationId, handleOffer]
     );
 
     const onAnswer = useCallback(
         async ({
             senderId,
+            conversationId: eventConversationId,
             answer,
         }: {
             senderId: string;
             conversationId: string;
             answer: RTCSessionDescriptionInit;
         }) => {
+            if (
+                eventConversationId !== conversationId
+            ) {
+                return;
+            }
+
             try {
                 await handleAnswer(
                     senderId,
@@ -541,18 +603,25 @@ export function GroupCallProvider({
                 );
             }
         },
-        [handleAnswer]
+        [conversationId, handleAnswer]
     );
 
     const onIceCandidate = useCallback(
         async ({
             senderId,
+            conversationId: eventConversationId,
             candidate,
         }: {
             senderId: string;
             conversationId: string;
             candidate: RTCIceCandidateInit;
         }) => {
+            if (
+                eventConversationId !== conversationId
+            ) {
+                return;
+            }
+
             try {
                 await handleIceCandidate(
                     senderId,
@@ -560,12 +629,12 @@ export function GroupCallProvider({
                 );
             } catch (error) {
                 console.error(
-                    "Failed to handle ICE candidate:",
+                    "Failed to handle group call ICE candidate:",
                     error
                 );
             }
         },
-        [handleIceCandidate]
+        [conversationId, handleIceCandidate]
     );
 
     const onUserLeft = useCallback(
@@ -601,9 +670,9 @@ export function GroupCallProvider({
                 return next;
             });
 
-            pendingIceCandidates.current.delete(
-                userId
-            );
+            pendingIceCandidates.current.delete(userId);
+
+            makingOffer.current.delete(userId);
         },
         []
     );
