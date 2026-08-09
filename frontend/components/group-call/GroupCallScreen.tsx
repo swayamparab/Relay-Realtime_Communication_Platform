@@ -7,6 +7,7 @@ export function GroupCallScreen() {
     const {
         inCall,
         callType,
+        participants,
         localStream,
         remoteStreams,
         leaveCall,
@@ -21,6 +22,7 @@ export function GroupCallScreen() {
 
     return (
         <div className="fixed inset-0 z-50 flex flex-col bg-black">
+
             {/* Header */}
             <div className="flex items-center justify-between px-6 py-4 text-white">
                 <div>
@@ -29,8 +31,8 @@ export function GroupCallScreen() {
                     </h2>
 
                     <p className="text-sm text-white/60">
-                        {remoteEntries.length + 1} participant
-                        {remoteEntries.length !== 0
+                        {participants.length} participant
+                        {participants.length !== 1
                             ? "s"
                             : ""}
                     </p>
@@ -40,15 +42,19 @@ export function GroupCallScreen() {
             {/* Video grid */}
             <div className="flex-1 p-4">
                 <div
-                    className={`grid h-full gap-3 ${remoteEntries.length === 0
+                    className={`
+                        grid
+                        h-full
+                        gap-3
+                        ${remoteEntries.length === 0
                             ? "grid-cols-1"
                             : remoteEntries.length === 1
                                 ? "grid-cols-2"
-                                : remoteEntries.length <= 3
-                                    ? "grid-cols-2"
-                                    : "grid-cols-2"
-                        }`}
+                                : "grid-cols-2"
+                        }
+                    `}
                 >
+
                     {/* Local user */}
                     {localStream && (
                         <div className="relative min-h-0 overflow-hidden rounded-xl bg-zinc-900">
