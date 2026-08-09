@@ -47,7 +47,8 @@ export function IncomingGroupCall() {
                     type="button"
                     onClick={() =>
                         joinCall(
-                            incomingCall.conversationId
+                            incomingCall.conversationId,
+                            incomingCall.type
                         )
                     }
                     className="flex-1 rounded-md bg-green-600 px-3 py-2 text-sm text-white"

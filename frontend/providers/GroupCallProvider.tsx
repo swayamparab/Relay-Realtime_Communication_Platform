@@ -30,7 +30,8 @@ type GroupCallContextType = {
     ) => void;
 
     joinCall: (
-        conversationId: string
+        conversationId: string,
+        type: CallType
     ) => void;
 
     leaveCall: () => void;
@@ -94,6 +95,10 @@ export function GroupCallProvider({
 
     const [localStream, setLocalStream] = useState<MediaStream | null>(null);
 
+    const localStreamRef = useRef<MediaStream | null>(null);
+
+    const conversationIdRef = useRef<string | null>(null);
+
     const [remoteStreams, setRemoteStreams] = useState<Map<string, MediaStream>>(new Map());
 
     const peerConnections = useRef(
@@ -133,12 +138,14 @@ export function GroupCallProvider({
                 ],
             });
 
-            localStream
+            const stream = localStreamRef.current;
+
+            stream
                 ?.getTracks()
                 .forEach((track) => {
                     peer.addTrack(
                         track,
-                        localStream
+                        stream
                     );
                 });
 
@@ -157,7 +164,7 @@ export function GroupCallProvider({
                 socket.emit(
                     "group_call:ice_candidate",
                     {
-                        conversationId,
+                        conversationId: conversationIdRef.current,
 
                         targetUserId:
                             remoteUserId,
@@ -227,7 +234,7 @@ export function GroupCallProvider({
 
             return peer;
         },
-        [socket, localStream, conversationId]
+        [socket]
     );
 
     const createOffer = useCallback(
@@ -267,7 +274,7 @@ export function GroupCallProvider({
                 socket.emit(
                     "group_call:offer",
                     {
-                        conversationId,
+                        conversationId: conversationIdRef.current,
                         targetUserId,
                         offer,
                     }
@@ -281,7 +288,6 @@ export function GroupCallProvider({
         },
         [
             socket,
-            conversationId,
             createPeerConnection,
         ]
     );
@@ -354,7 +360,7 @@ export function GroupCallProvider({
             socket.emit(
                 "group_call:answer",
                 {
-                    conversationId,
+                    conversationId: conversationIdRef.current,
                     targetUserId: senderId,
                     answer,
                 }
@@ -362,7 +368,6 @@ export function GroupCallProvider({
         },
         [
             socket,
-            conversationId,
             createPeerConnection,
         ]
     );
@@ -454,6 +459,9 @@ export function GroupCallProvider({
 
         setLocalStream(null);
 
+        localStreamRef.current = null;
+        conversationIdRef.current = null;
+
         peerConnections.current.forEach((peer) => {
             peer.close();
         });
@@ -478,6 +486,7 @@ export function GroupCallProvider({
         setCallType(null);
         setParticipants([]);
         setInCall(false);
+        setIncomingCall(null);
     }, [localStream]);
 
     const leaveCall = useCallback(() => {
@@ -508,7 +517,7 @@ export function GroupCallProvider({
                 return [...prev, userId];
             });
 
-            if (!localStream || !conversationId) {
+            if (!localStreamRef.current || !conversationIdRef.current) {
                 return;
             }
 
@@ -532,9 +541,7 @@ export function GroupCallProvider({
             }
         },
         [
-            localStream,
-            conversationId,
-            createOffer,
+            createOffer
         ]
     );
 
@@ -549,7 +556,7 @@ export function GroupCallProvider({
             offer: RTCSessionDescriptionInit;
         }) => {
             if (
-                eventConversationId !== conversationId
+                eventConversationId !== conversationIdRef.current
             ) {
                 return;
             }
@@ -566,7 +573,7 @@ export function GroupCallProvider({
                 );
             }
         },
-        [conversationId, handleOffer]
+        [handleOffer]
     );
 
     const onAnswer = useCallback(
@@ -580,7 +587,7 @@ export function GroupCallProvider({
             answer: RTCSessionDescriptionInit;
         }) => {
             if (
-                eventConversationId !== conversationId
+                eventConversationId !== conversationIdRef.current
             ) {
                 return;
             }
@@ -597,7 +604,7 @@ export function GroupCallProvider({
                 );
             }
         },
-        [conversationId, handleAnswer]
+        [handleAnswer]
     );
 
     const onIceCandidate = useCallback(
@@ -611,7 +618,7 @@ export function GroupCallProvider({
             candidate: RTCIceCandidateInit;
         }) => {
             if (
-                eventConversationId !== conversationId
+                eventConversationId !== conversationIdRef.current
             ) {
                 return;
             }
@@ -628,7 +635,7 @@ export function GroupCallProvider({
                 );
             }
         },
-        [conversationId, handleIceCandidate]
+        [handleIceCandidate]
     );
 
     const onUserLeft = useCallback(
@@ -721,6 +728,7 @@ export function GroupCallProvider({
                     });
 
                 setLocalStream(stream);
+                localStreamRef.current = stream;
 
                 return stream;
             } catch {
@@ -745,6 +753,8 @@ export function GroupCallProvider({
             if (!stream) {
                 return;
             }
+
+            conversationIdRef.current = conversationId;
 
             socket.emit(
                 "group_call:start",
@@ -786,55 +796,59 @@ export function GroupCallProvider({
     );
 
     const joinCall = useCallback(
-        async (conversationId: string) => {
+        async (
+            conversationId: string,
+            type: CallType
+        ) => {
+            // get media BEFORE joining the call
+            const stream =
+                await getLocalStream(type);
+
+            if (!stream) {
+                return;
+            }
+
+            // Set these BEFORE socket join.
+            setConversationId(conversationId);
+            setCallType(type);
+
+            conversationIdRef.current = conversationId;
 
             socket.emit(
                 "group_call:join",
                 {
                     conversationId,
                 },
-                async (response: {
+                (response: {
                     success: boolean;
                     message?: string;
                     participants?: string[];
                     type: CallType;
                 }) => {
-
                     if (!response.success) {
                         toast.error(
                             response.message ??
                             "Failed to join group call."
                         );
 
+                        cleanupCall();
                         return;
                     }
-
-                    const stream =
-                        await getLocalStream(
-                            response.type
-                        );
-
-                    if (!stream) {
-                        return;
-                    }
-
-                    setConversationId(
-                        conversationId
-                    );
-
-                    setCallType(response.type);
 
                     setParticipants(
                         response.participants ?? []
                     );
 
                     setInCall(true);
-
                     setIncomingCall(null);
                 }
             );
         },
-        [socket, getLocalStream]
+        [
+            socket,
+            getLocalStream,
+            cleanupCall,
+        ]
     );
 
     return (
