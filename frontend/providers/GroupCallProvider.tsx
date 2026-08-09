@@ -7,13 +7,11 @@ import {
     useState,
 } from "react";
 
-import { toast, Toaster } from "sonner";
+import { toast } from "sonner";
 
 import { useSocket } from "@/hooks/useSocket";
 import { useGroupCallEvents } from "@/hooks/group-call/useGroupCallEvents";
 import { GroupCallScreen } from "@/components/group-call/GroupCallScreen";
-import { CallEvents } from "@/components/providers/CallEvents";
-import { WebRTCEvents } from "@/components/providers/WebRTCEvents";
 import { IncomingGroupCall } from "@/components/group-call/IncomingGroupCall";
 
 type CallType = "voice" | "video";
@@ -22,7 +20,10 @@ type GroupCallContextType = {
     inCall: boolean;
     conversationId: string | null;
     callType: CallType | null;
-    participants: string[];
+    participants: {
+        id: string;
+        username: string;
+    }[];
 
     startCall: (
         conversationId: string,
@@ -91,7 +92,12 @@ export function GroupCallProvider({
 
     const [callType, setCallType] = useState<CallType | null>(null);
 
-    const [participants, setParticipants] = useState<string[]>([]);
+    const [participants, setParticipants] = useState<
+        {
+            id: string;
+            username: string;
+        }[]
+    >([]);
 
     const [localStream, setLocalStream] = useState<MediaStream | null>(null);
 
@@ -506,15 +512,28 @@ export function GroupCallProvider({
     const onUserJoined = useCallback(
         async ({
             userId,
+            username
         }: {
             userId: string;
+            username: string
         }) => {
             setParticipants((prev) => {
-                if (prev.includes(userId)) {
+                if (
+                    prev.some(
+                        (participant) =>
+                            participant.id === userId
+                    )
+                ) {
                     return prev;
                 }
 
-                return [...prev, userId];
+                return [
+                    ...prev,
+                    {
+                        id: userId,
+                        username,
+                    },
+                ];
             });
 
             if (!localStreamRef.current || !conversationIdRef.current) {
@@ -646,7 +665,8 @@ export function GroupCallProvider({
         }) => {
             setParticipants((prev) =>
                 prev.filter(
-                    (id) => id !== userId
+                    (participant) =>
+                        participant.id !== userId
                 )
             );
 
@@ -765,7 +785,10 @@ export function GroupCallProvider({
                 (response: {
                     success: boolean;
                     message?: string;
-                    participants?: string[];
+                    participants?: {
+                        id: string,
+                        username: string
+                    }[];
                     type: CallType
                 }) => {
                     if (!response.success) {
@@ -822,7 +845,10 @@ export function GroupCallProvider({
                 (response: {
                     success: boolean;
                     message?: string;
-                    participants?: string[];
+                    participants?: {
+                        id: string,
+                        username: string
+                    }[];
                     type: CallType;
                 }) => {
                     if (!response.success) {

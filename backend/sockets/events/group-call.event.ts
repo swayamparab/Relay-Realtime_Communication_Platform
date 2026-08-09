@@ -1,7 +1,6 @@
 import { Server, Socket } from "socket.io";
 
 import {
-    getConversationParticipantIds,
     isParticipant,
 } from "../../modules/conversation/conversation.service";
 
@@ -18,11 +17,44 @@ import {
     getActiveGroupCall,
 } from "../../services/group-call.service";
 
+import { db } from "../../db";
+import { eq } from "drizzle-orm";
+import { users } from "../../db/schema";
+
+async function getUsername(userId: string) {
+    const user = await db.query.users.findFirst({
+        where: eq(users.id, userId),
+        columns: {
+            username: true,
+        },
+    });
+
+    return user?.username ?? "Unknown";
+}
+
+async function getParticipantsWithUsernames(
+    conversationId: string
+) {
+    const participantIds =
+        getGroupCallParticipants(
+            conversationId
+        );
+
+    return Promise.all(
+        participantIds.map(
+            async (userId) => ({
+                id: userId,
+                username:
+                    await getUsername(userId),
+            })
+        )
+    );
+}
+
 export function registerGroupCallEvents(
     io: Server,
     socket: Socket
 ) {
-
     socket.on(
         "group_call:start",
         async (
@@ -90,21 +122,26 @@ export function registerGroupCallEvents(
                     `group-call:${conversationId}`
                 );
 
+                // Ring all other conversation members.
                 socket.to(conversationId).emit(
                     "group_call:incoming",
                     {
                         conversationId,
-                        callerId: socket.userId,
+                        callerId:
+                            socket.userId,
                         type,
-                    });
+                    }
+                );
+
+                const participants =
+                    await getParticipantsWithUsernames(
+                        conversationId
+                    );
 
                 callback?.({
                     success: true,
                     type: groupCall.type,
-                    participants:
-                        getGroupCallParticipants(
-                            conversationId
-                        ),
+                    participants,
                 });
             } catch (error) {
                 callback?.({
@@ -176,21 +213,32 @@ export function registerGroupCallEvents(
                     `group-call:${conversationId}`
                 );
 
+                const username =
+                    await getUsername(
+                        socket.userId
+                    );
+
+                // Tell existing participants
+                // who joined.
                 socket.to(
                     `group-call:${conversationId}`
                 ).emit(
                     "group_call:user_joined",
                     {
-                        userId: socket.userId,
+                        userId:
+                            socket.userId,
+                        username,
                     }
                 );
 
+                const participants =
+                    await getParticipantsWithUsernames(
+                        conversationId
+                    );
+
                 callback?.({
                     success: true,
-                    participants:
-                        getGroupCallParticipants(
-                            conversationId
-                        ),
+                    participants,
                     type: activeCall.type,
                 });
             } catch (error) {
@@ -251,16 +299,15 @@ export function registerGroupCallEvents(
                         conversationId
                     );
 
-                // Remove everyone from in-memory
-                // group-call state.
-                participants.forEach((userId) => {
-                    leaveGroupCall(
-                        conversationId,
-                        userId
-                    );
-                });
+                participants.forEach(
+                    (userId) => {
+                        leaveGroupCall(
+                            conversationId,
+                            userId
+                        );
+                    }
+                );
 
-                // Notify everyone currently in the call.
                 io.to(
                     `group-call:${conversationId}`
                 ).emit(
@@ -270,7 +317,6 @@ export function registerGroupCallEvents(
                     }
                 );
 
-                // Remove this socket from the room.
                 socket.leave(
                     `group-call:${conversationId}`
                 );
@@ -327,24 +373,22 @@ export function registerGroupCallEvents(
                     });
                 }
 
-                // Remove user from in-memory call state
                 leaveGroupCall(
                     conversationId,
                     socket.userId
                 );
 
-                // Remove socket from the call room
                 socket.leave(
                     `group-call:${conversationId}`
                 );
 
-                // Tell remaining participants
                 io.to(
                     `group-call:${conversationId}`
                 ).emit(
                     "group_call:user_left",
                     {
-                        userId: socket.userId,
+                        userId:
+                            socket.userId,
                     }
                 );
 
@@ -353,9 +397,9 @@ export function registerGroupCallEvents(
                         conversationId
                     );
 
-                // Last participant left
                 if (
-                    remainingParticipants.length === 0
+                    remainingParticipants.length ===
+                    0
                 ) {
                     await endGroupCall(
                         conversationId

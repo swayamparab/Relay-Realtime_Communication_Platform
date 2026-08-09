@@ -1,7 +1,10 @@
 "use client";
 
+import { useState } from "react";
 import { VideoTile } from "./VideoTile";
 import { useGroupCall } from "@/hooks/group-call/useGroupCall";
+
+import { Mic, MicOff, Video, VideoOff, PhoneOff } from "lucide-react";
 
 export function GroupCallScreen() {
     const {
@@ -12,6 +15,9 @@ export function GroupCallScreen() {
         remoteStreams,
         leaveCall,
     } = useGroupCall();
+
+    const [isMuted, setIsMuted] = useState(false);
+    const [isCameraOff, setIsCameraOff] = useState(false);
 
     if (!inCall) {
         return null;
@@ -46,11 +52,15 @@ export function GroupCallScreen() {
                         grid
                         h-full
                         gap-3
-                        ${remoteEntries.length === 0
+                        ${participants.length <= 1
                             ? "grid-cols-1"
-                            : remoteEntries.length === 1
+                            : participants.length === 2
                                 ? "grid-cols-2"
-                                : "grid-cols-2"
+                                : participants.length === 3
+                                    ? "grid-cols-2 grid-rows-2"
+                                    : participants.length === 4
+                                        ? "grid-cols-2 grid-rows-2"
+                                        : "grid-cols-2 grid-rows-3"
                         }
                     `}
                 >
@@ -71,20 +81,26 @@ export function GroupCallScreen() {
 
                     {/* Remote users */}
                     {remoteEntries.map(
-                        ([userId, stream]) => (
-                            <div
-                                key={userId}
-                                className="relative min-h-0 overflow-hidden rounded-xl bg-zinc-900"
-                            >
-                                <VideoTile
-                                    stream={stream}
-                                />
+                        ([userId, stream]) => {
+                            const participant =
+                                participants.find(
+                                    (participant) =>
+                                        participant.id === userId
+                                );
 
-                                <span className="absolute bottom-3 left-3 rounded-md bg-black/60 px-2 py-1 text-xs text-white">
-                                    {userId}
-                                </span>
-                            </div>
-                        )
+                            return (
+                                <div
+                                    key={userId}
+                                    className="relative min-h-0 overflow-hidden rounded-xl bg-zinc-900"
+                                >
+                                    <VideoTile stream={stream} />
+
+                                    <span className="absolute bottom-3 left-3 rounded-md bg-black/60 px-2 py-1 text-xs text-white backdrop-blur">
+                                        {participant?.username ?? "Unknown"}
+                                    </span>
+                                </div>
+                            );
+                        }
                     )}
                 </div>
             </div>
@@ -93,10 +109,52 @@ export function GroupCallScreen() {
             <div className="flex justify-center gap-3 px-6 py-5">
                 <button
                     type="button"
-                    onClick={leaveCall}
-                    className="rounded-full bg-red-600 px-6 py-3 text-sm font-medium text-white hover:bg-red-700"
+                    onClick={() => {
+                        localStream?.getAudioTracks().forEach(
+                            (track) => {
+                                track.enabled = !track.enabled;
+                            }
+                        );
+
+                        setIsMuted((prev) => !prev);
+                    }}
+                    className="rounded-full bg-zinc-800 p-4 text-white hover:bg-zinc-700"
                 >
-                    Leave call
+                    {isMuted ? (
+                        <MicOff className="size-5" />
+                    ) : (
+                        <Mic className="size-5" />
+                    )}
+                </button>
+
+                {callType === "video" && (
+                    <button
+                        type="button"
+                        onClick={() => {
+                            localStream?.getVideoTracks().forEach(
+                                (track) => {
+                                    track.enabled = !track.enabled;
+                                }
+                            );
+
+                            setIsCameraOff((prev) => !prev);
+                        }}
+                        className="rounded-full bg-zinc-800 p-4 text-white hover:bg-zinc-700"
+                    >
+                        {isCameraOff ? (
+                            <VideoOff className="size-5" />
+                        ) : (
+                            <Video className="size-5" />
+                        )}
+                    </button>
+                )}
+
+                <button
+                    type="button"
+                    onClick={leaveCall}
+                    className="rounded-full bg-red-600 p-4 text-white hover:bg-red-700"
+                >
+                    <PhoneOff className="size-5" />
                 </button>
             </div>
         </div>

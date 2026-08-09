@@ -7,6 +7,7 @@ import { useSocket } from "@/hooks/useSocket";
 type Props = {
     onUserJoined: (data: {
         userId: string;
+        username: string;
     }) => void;
 
     onUserLeft: (data: {
