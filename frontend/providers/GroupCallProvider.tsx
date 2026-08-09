@@ -222,12 +222,6 @@ export function GroupCallProvider({
 
                         return next;
                     });
-
-                    setParticipants((prev) =>
-                        prev.filter(
-                            (id) => id !== remoteUserId
-                        )
-                    );
                 }
             };
 
