@@ -12,6 +12,7 @@ import { WebRTCProvider } from "@/providers/WebRTCProvider";
 import { CallEvents } from "@/components/providers/CallEvents";
 import { WebRTCEvents } from "@/components/providers/WebRTCEvents";
 import { GroupCallProvider } from "@/providers/GroupCallProvider";
+import { GroupWebRTCProvider } from "@/providers/GroupWebRTCProvider";
 
 const geist = Geist({
   subsets: ["latin"],
@@ -42,15 +43,17 @@ export default function RootLayout({
           <SocketProvider>
             <WebRTCProvider>
               <CallProvider>
-                <GroupCallProvider>
-                  <CallEvents />
-                  <WebRTCEvents />
-                  {children}
-                  <Toaster
-                    position="top-right"
-                    richColors
-                  />
-                </GroupCallProvider>
+                <GroupWebRTCProvider>
+                  <GroupCallProvider>
+                    <CallEvents />
+                    <WebRTCEvents />
+                    {children}
+                    <Toaster
+                      position="top-right"
+                      richColors
+                    />
+                  </GroupCallProvider>
+                </GroupWebRTCProvider>
               </CallProvider>
             </WebRTCProvider>
           </SocketProvider>

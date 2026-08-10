@@ -3,7 +3,6 @@
 import {
     createContext,
     useCallback,
-    useRef,
     useState,
 } from "react";
 
@@ -11,19 +10,26 @@ import { toast } from "sonner";
 
 import { useSocket } from "@/hooks/useSocket";
 import { useGroupCallEvents } from "@/hooks/group-call/useGroupCallEvents";
+import { useGroupWebRTC } from "@/hooks/group-call/useGroupWebRTC";
+
 import { GroupCallScreen } from "@/components/group-call/GroupCallScreen";
 import { IncomingGroupCall } from "@/components/group-call/IncomingGroupCall";
 
 type CallType = "voice" | "video";
 
+type Participant = {
+    id: string;
+    username: string;
+};
+
 type GroupCallContextType = {
     inCall: boolean;
+
     conversationId: string | null;
+
     callType: CallType | null;
-    participants: {
-        id: string;
-        username: string;
-    }[];
+
+    participants: Participant[];
 
     startCall: (
         conversationId: string,
@@ -37,33 +43,6 @@ type GroupCallContextType = {
 
     leaveCall: () => void;
 
-    localStream: MediaStream | null;
-
-    remoteStreams: Map<string, MediaStream>;
-
-    createPeerConnection: (
-        remoteUserId: string
-    ) => RTCPeerConnection;
-
-    createOffer: (
-        targetUserId: string
-    ) => Promise<void>;
-
-    handleOffer: (
-        senderId: string,
-        offer: RTCSessionDescriptionInit
-    ) => Promise<void>;
-
-    handleAnswer: (
-        senderId: string,
-        answer: RTCSessionDescriptionInit
-    ) => Promise<void>;
-
-    handleIceCandidate: (
-        senderId: string,
-        candidate: RTCIceCandidateInit
-    ) => Promise<void>;
-
     incomingCall: {
         conversationId: string;
         callerId: string;
@@ -74,7 +53,9 @@ type GroupCallContextType = {
 };
 
 export const GroupCallContext =
-    createContext<GroupCallContextType | null>(null);
+    createContext<GroupCallContextType | null>(
+        null
+    );
 
 export function GroupCallProvider({
     children,
@@ -83,423 +64,63 @@ export function GroupCallProvider({
 }) {
     const { socket } = useSocket();
 
-    const [inCall, setInCall] = useState(false);
+    const {
+        setConversationId: setWebRTCConversationId,
+        getLocalStream,
+        createOffer,
+        handleOffer,
+        handleAnswer,
+        handleIceCandidate,
+        hasPeerConnection,
+        cleanupWebRTC,
+    } = useGroupWebRTC();
 
-    const [
-        conversationId,
-        setConversationId,
-    ] = useState<string | null>(null);
+    const [inCall, setInCall] =
+        useState(false);
 
-    const [callType, setCallType] = useState<CallType | null>(null);
+    const [conversationId, setConversationId] =
+        useState<string | null>(null);
 
-    const [participants, setParticipants] = useState<
-        {
-            id: string;
-            username: string;
-        }[]
-    >([]);
+    const [callType, setCallType] =
+        useState<CallType | null>(null);
 
-    const [localStream, setLocalStream] = useState<MediaStream | null>(null);
+    const [participants, setParticipants] =
+        useState<Participant[]>([]);
 
-    const localStreamRef = useRef<MediaStream | null>(null);
-
-    const conversationIdRef = useRef<string | null>(null);
-
-    const [remoteStreams, setRemoteStreams] = useState<Map<string, MediaStream>>(new Map());
-
-    const peerConnections = useRef(
-        new Map<string, RTCPeerConnection>()
-    );
-
-    const pendingIceCandidates = useRef(
-        new Map<string, RTCIceCandidateInit[]>()
-    );
-
-    const makingOffer = useRef(
-        new Map<string, boolean>()
-    );
-
-    const [incomingCall, setIncomingCall] = useState<{
-        conversationId: string;
-        callerId: string;
-        type: CallType;
-    } | null>(null);
+    const [incomingCall, setIncomingCall] =
+        useState<{
+            conversationId: string;
+            callerId: string;
+            type: CallType;
+        } | null>(null);
 
     const declineCall = useCallback(() => {
         setIncomingCall(null);
     }, []);
 
-    const createPeerConnection = useCallback(
-        (
-            remoteUserId: string
-        ) => {
-
-            const peer = new RTCPeerConnection({
-                iceServers: [
-                    {
-                        urls: [
-                            "stun:stun.l.google.com:19302",
-                        ],
-                    },
-                ],
-            });
-
-            const stream = localStreamRef.current;
-
-            stream
-                ?.getTracks()
-                .forEach((track) => {
-                    peer.addTrack(
-                        track,
-                        stream
-                    );
-                });
-
-            peerConnections.current.set(
-                remoteUserId,
-                peer
-            );
-
-            peer.onicecandidate = (
-                event
-            ) => {
-                if (!event.candidate) {
-                    return;
-                }
-
-                socket.emit(
-                    "group_call:ice_candidate",
-                    {
-                        conversationId: conversationIdRef.current,
-
-                        targetUserId:
-                            remoteUserId,
-
-                        candidate:
-                            event.candidate,
-                    }
-                );
-            };
-
-            peer.ontrack = (event) => {
-                const stream = event.streams[0];
-
-                if (!stream) {
-                    return;
-                }
-
-                setRemoteStreams((prev) => {
-                    const next = new Map(prev);
-
-                    next.set(
-                        remoteUserId,
-                        stream
-                    );
-
-                    return next;
-                });
-            };
-
-            peer.onconnectionstatechange = () => {
-
-                console.log(
-                    "Connection state:",
-                    remoteUserId,
-                    peer.connectionState
-                );
-
-                const state = peer.connectionState;
-
-                if (
-                    state === "failed" ||
-                    state === "closed"
-                ) {
-                    peer.close();
-
-                    peerConnections.current.delete(
-                        remoteUserId
-                    );
-
-                    pendingIceCandidates.current.delete(
-                        remoteUserId
-                    );
-
-                    makingOffer.current.delete(
-                        remoteUserId
-                    );
-
-                    setRemoteStreams((prev) => {
-                        const next = new Map(prev);
-
-                        next.delete(remoteUserId);
-
-                        return next;
-                    });
-                }
-            };
-
-            return peer;
-        },
-        [socket]
-    );
-
-    const createOffer = useCallback(
-        async (targetUserId: string) => {
-            let peer =
-                peerConnections.current.get(
-                    targetUserId
-                );
-
-            if (!peer) {
-                peer =
-                    createPeerConnection(
-                        targetUserId
-                    );
-            }
-
-            if (
-                peer.signalingState !==
-                "stable"
-            ) {
-                return;
-            }
-
-            try {
-                makingOffer.current.set(
-                    targetUserId,
-                    true
-                );
-
-                const offer =
-                    await peer.createOffer();
-
-                await peer.setLocalDescription(
-                    offer
-                );
-
-                socket.emit(
-                    "group_call:offer",
-                    {
-                        conversationId: conversationIdRef.current,
-                        targetUserId,
-                        offer,
-                    }
-                );
-            } finally {
-                makingOffer.current.set(
-                    targetUserId,
-                    false
-                );
-            }
-        },
-        [
-            socket,
-            createPeerConnection,
-        ]
-    );
-
-    const handleOffer = useCallback(
-        async (
-            senderId: string,
-            offer: RTCSessionDescriptionInit
-        ) => {
-            let peer =
-                peerConnections.current.get(
-                    senderId
-                );
-
-            if (!peer) {
-                peer =
-                    createPeerConnection(
-                        senderId
-                    );
-            }
-
-            if (
-                makingOffer.current.get(
-                    senderId
-                )
-            ) {
-                return;
-            }
-
-            if (
-                peer.signalingState !==
-                "stable"
-            ) {
-                return;
-            }
-
-            await peer.setRemoteDescription(
-                offer
-            );
-
-            const pending =
-                pendingIceCandidates.current.get(
-                    senderId
-                ) ?? [];
-
-            for (const candidate of pending) {
-                try {
-                    await peer.addIceCandidate(
-                        candidate
-                    );
-                } catch (error) {
-                    console.error(
-                        "Failed to add pending ICE candidate:",
-                        error
-                    );
-                }
-            }
-
-            pendingIceCandidates.current.delete(
-                senderId
-            );
-
-            const answer =
-                await peer.createAnswer();
-
-            await peer.setLocalDescription(
-                answer
-            );
-
-            socket.emit(
-                "group_call:answer",
-                {
-                    conversationId: conversationIdRef.current,
-                    targetUserId: senderId,
-                    answer,
-                }
-            );
-        },
-        [
-            socket,
-            createPeerConnection,
-        ]
-    );
-
-    const handleAnswer = useCallback(
-        async (
-            senderId: string,
-            answer: RTCSessionDescriptionInit
-        ) => {
-            const peer =
-                peerConnections.current.get(
-                    senderId
-                );
-
-            if (!peer) {
-                return;
-            }
-
-            console.log(
-                "Received answer from:",
-                senderId
-            );
-
-            await peer.setRemoteDescription(
-                answer
-            );
-        },
-        []
-    );
-
-    const handleIceCandidate = useCallback(
-        async (
-            senderId: string,
-            candidate: RTCIceCandidateInit
-        ) => {
-            const peer =
-                peerConnections.current.get(
-                    senderId
-                );
-
-            if (!peer) {
-                const pending =
-                    pendingIceCandidates.current.get(
-                        senderId
-                    ) ?? [];
-
-                pending.push(candidate);
-
-                pendingIceCandidates.current.set(
-                    senderId,
-                    pending
-                );
-
-                return;
-            }
-
-            if (!peer.remoteDescription) {
-                const pending =
-                    pendingIceCandidates.current.get(
-                        senderId
-                    ) ?? [];
-
-                pending.push(candidate);
-
-                pendingIceCandidates.current.set(
-                    senderId,
-                    pending
-                );
-
-                return;
-            }
-
-            console.log(
-                "Received ICE candidate from:",
-                senderId
-            );
-
-            await peer.addIceCandidate(
-                candidate
-            );
-        },
-        []
-    );
-
     const cleanupCall = useCallback(() => {
-        localStream?.getTracks().forEach((track) => {
-            track.stop();
-        });
-
-        setLocalStream(null);
-
-        localStreamRef.current = null;
-        conversationIdRef.current = null;
-
-        peerConnections.current.forEach((peer) => {
-            peer.close();
-        });
-
-        peerConnections.current.clear();
-
-        setRemoteStreams((prev) => {
-            prev.forEach((stream) => {
-                stream.getTracks().forEach((track) => {
-                    track.stop();
-                });
-            });
-
-            return new Map();
-        });
-
-        pendingIceCandidates.current.clear();
-
-        makingOffer.current.clear();
+        cleanupWebRTC();
 
         setConversationId(null);
         setCallType(null);
         setParticipants([]);
         setInCall(false);
         setIncomingCall(null);
-    }, [localStream]);
+
+        setWebRTCConversationId(null);
+    }, [
+        cleanupWebRTC,
+        setWebRTCConversationId,
+    ]);
 
     const leaveCall = useCallback(() => {
         if (conversationId) {
-            socket.emit("group_call:leave", {
-                conversationId,
-            });
+            socket.emit(
+                "group_call:leave",
+                {
+                    conversationId,
+                }
+            );
         }
 
         cleanupCall();
@@ -512,16 +133,17 @@ export function GroupCallProvider({
     const onUserJoined = useCallback(
         async ({
             userId,
-            username
+            username,
         }: {
             userId: string;
-            username: string
+            username: string;
         }) => {
             setParticipants((prev) => {
                 if (
                     prev.some(
                         (participant) =>
-                            participant.id === userId
+                            participant.id ===
+                            userId
                     )
                 ) {
                     return prev;
@@ -535,18 +157,8 @@ export function GroupCallProvider({
                     },
                 ];
             });
-
-            if (!localStreamRef.current || !conversationIdRef.current) {
-                return;
-            }
-
-            // Don't create another connection
-            // if one already exists.
-            if (
-                peerConnections.current.has(
-                    userId
-                )
-            ) {
+            
+            if (hasPeerConnection(userId)) {
                 return;
             }
 
@@ -560,14 +172,33 @@ export function GroupCallProvider({
             }
         },
         [
-            createOffer
+            createOffer,
+            hasPeerConnection
         ]
+    );
+
+    const onUserLeft = useCallback(
+        ({
+            userId,
+        }: {
+            userId: string;
+        }) => {
+            setParticipants((prev) =>
+                prev.filter(
+                    (participant) =>
+                        participant.id !==
+                        userId
+                )
+            );
+        },
+        []
     );
 
     const onOffer = useCallback(
         async ({
             senderId,
-            conversationId: eventConversationId,
+            conversationId:
+            eventConversationId,
             offer,
         }: {
             senderId: string;
@@ -575,7 +206,8 @@ export function GroupCallProvider({
             offer: RTCSessionDescriptionInit;
         }) => {
             if (
-                eventConversationId !== conversationIdRef.current
+                eventConversationId !==
+                conversationId
             ) {
                 return;
             }
@@ -592,13 +224,17 @@ export function GroupCallProvider({
                 );
             }
         },
-        [handleOffer]
+        [
+            conversationId,
+            handleOffer,
+        ]
     );
 
     const onAnswer = useCallback(
         async ({
             senderId,
-            conversationId: eventConversationId,
+            conversationId:
+            eventConversationId,
             answer,
         }: {
             senderId: string;
@@ -606,7 +242,8 @@ export function GroupCallProvider({
             answer: RTCSessionDescriptionInit;
         }) => {
             if (
-                eventConversationId !== conversationIdRef.current
+                eventConversationId !==
+                conversationId
             ) {
                 return;
             }
@@ -623,13 +260,17 @@ export function GroupCallProvider({
                 );
             }
         },
-        [handleAnswer]
+        [
+            conversationId,
+            handleAnswer,
+        ]
     );
 
     const onIceCandidate = useCallback(
         async ({
             senderId,
-            conversationId: eventConversationId,
+            conversationId:
+            eventConversationId,
             candidate,
         }: {
             senderId: string;
@@ -637,7 +278,8 @@ export function GroupCallProvider({
             candidate: RTCIceCandidateInit;
         }) => {
             if (
-                eventConversationId !== conversationIdRef.current
+                eventConversationId !==
+                conversationId
             ) {
                 return;
             }
@@ -649,53 +291,15 @@ export function GroupCallProvider({
                 );
             } catch (error) {
                 console.error(
-                    "Failed to handle group call ICE candidate:",
+                    "Failed to handle group call ICE:",
                     error
                 );
             }
         },
-        [handleIceCandidate]
-    );
-
-    const onUserLeft = useCallback(
-        ({
-            userId,
-        }: {
-            userId: string;
-        }) => {
-            setParticipants((prev) =>
-                prev.filter(
-                    (participant) =>
-                        participant.id !== userId
-                )
-            );
-
-            const peer =
-                peerConnections.current.get(
-                    userId
-                );
-
-            if (peer) {
-                peer.close();
-
-                peerConnections.current.delete(
-                    userId
-                );
-            }
-
-            setRemoteStreams((prev) => {
-                const next = new Map(prev);
-
-                next.delete(userId);
-
-                return next;
-            });
-
-            pendingIceCandidates.current.delete(userId);
-
-            makingOffer.current.delete(userId);
-        },
-        []
+        [
+            conversationId,
+            handleIceCandidate,
+        ]
     );
 
     const onIncomingCall = useCallback(
@@ -708,9 +312,6 @@ export function GroupCallProvider({
             callerId: string;
             type: CallType;
         }) => {
-
-            // Don't show the incoming call to someone
-            // who is already inside a call.
             if (inCall) {
                 return;
             }
@@ -735,76 +336,59 @@ export function GroupCallProvider({
         onOffer,
         onAnswer,
         onIceCandidate,
-        onIncomingCall
+        onIncomingCall,
     });
-
-    const getLocalStream = useCallback(
-        async (type: CallType) => {
-            try {
-                const stream =
-                    await navigator.mediaDevices.getUserMedia({
-                        audio: true,
-                        video: type === "video",
-                    });
-
-                setLocalStream(stream);
-                localStreamRef.current = stream;
-
-                return stream;
-            } catch {
-                toast.error(
-                    "Unable to access microphone/camera."
-                );
-
-                return null;
-            }
-        },
-        []
-    );
 
     const startCall = useCallback(
         async (
             conversationId: string,
             type: CallType
         ) => {
-
-            const stream = await getLocalStream(type);
+            const stream =
+                await getLocalStream(type);
 
             if (!stream) {
+                toast.error(
+                    "Unable to access microphone/camera."
+                );
+
                 return;
             }
 
-            conversationIdRef.current = conversationId;
+            setConversationId(
+                conversationId
+            );
+
+            setCallType(type);
+
+            setWebRTCConversationId(
+                conversationId
+            );
 
             socket.emit(
                 "group_call:start",
                 {
                     conversationId,
-                    type
+                    type,
                 },
                 (response: {
                     success: boolean;
                     message?: string;
-                    participants?: {
-                        id: string,
-                        username: string
-                    }[];
-                    type: CallType
+                    participants?: Participant[];
+                    type: CallType;
                 }) => {
-                    if (!response.success) {
+                    if (
+                        !response.success
+                    ) {
                         toast.error(
                             response.message ??
                             "Failed to start group call."
                         );
 
+                        cleanupCall();
+
                         return;
                     }
-
-                    setConversationId(
-                        conversationId
-                    );
-
-                    setCallType(response.type);
 
                     setParticipants(
                         response.participants ??
@@ -815,7 +399,12 @@ export function GroupCallProvider({
                 }
             );
         },
-        [socket, getLocalStream]
+        [
+            socket,
+            getLocalStream,
+            setWebRTCConversationId,
+            cleanupCall,
+        ]
     );
 
     const joinCall = useCallback(
@@ -823,19 +412,26 @@ export function GroupCallProvider({
             conversationId: string,
             type: CallType
         ) => {
-            // get media BEFORE joining the call
             const stream =
                 await getLocalStream(type);
 
             if (!stream) {
+                toast.error(
+                    "Unable to access microphone/camera."
+                );
+
                 return;
             }
 
-            // Set these BEFORE socket join.
-            setConversationId(conversationId);
+            setConversationId(
+                conversationId
+            );
+
             setCallType(type);
 
-            conversationIdRef.current = conversationId;
+            setWebRTCConversationId(
+                conversationId
+            );
 
             socket.emit(
                 "group_call:join",
@@ -845,27 +441,33 @@ export function GroupCallProvider({
                 (response: {
                     success: boolean;
                     message?: string;
-                    participants?: {
-                        id: string,
-                        username: string
-                    }[];
+                    participants?: Participant[];
                     type: CallType;
                 }) => {
-                    if (!response.success) {
+                    if (
+                        !response.success
+                    ) {
                         toast.error(
                             response.message ??
                             "Failed to join group call."
                         );
 
                         cleanupCall();
+
                         return;
                     }
 
                     setParticipants(
-                        response.participants ?? []
+                        response.participants ??
+                        []
+                    );
+
+                    setCallType(
+                        response.type
                     );
 
                     setInCall(true);
+
                     setIncomingCall(null);
                 }
             );
@@ -873,6 +475,7 @@ export function GroupCallProvider({
         [
             socket,
             getLocalStream,
+            setWebRTCConversationId,
             cleanupCall,
         ]
     );
@@ -885,24 +488,16 @@ export function GroupCallProvider({
                 callType,
                 participants,
 
-                incomingCall,
-                declineCall,
-
                 startCall,
                 joinCall,
                 leaveCall,
 
-                localStream,
-                remoteStreams,
-
-                createPeerConnection,
-                createOffer,
-                handleOffer,
-                handleAnswer,
-                handleIceCandidate,
+                incomingCall,
+                declineCall,
             }}
         >
             <IncomingGroupCall />
+
             <GroupCallScreen />
 
             {children}
