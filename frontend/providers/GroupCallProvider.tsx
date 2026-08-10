@@ -50,6 +50,12 @@ type GroupCallContextType = {
     } | null;
 
     declineCall: () => void;
+
+    isMinimized: boolean;
+
+    setIsMinimized: React.Dispatch<
+        React.SetStateAction<boolean>
+    >;
 };
 
 export const GroupCallContext =
@@ -96,6 +102,9 @@ export function GroupCallProvider({
             type: CallType;
         } | null>(null);
 
+    const [isMinimized, setIsMinimized] =
+        useState(false);
+
     const declineCall = useCallback(() => {
         setIncomingCall(null);
     }, []);
@@ -110,6 +119,8 @@ export function GroupCallProvider({
         setIncomingCall(null);
 
         setWebRTCConversationId(null);
+
+        setIsMinimized(false);
     }, [
         cleanupWebRTC,
         setWebRTCConversationId,
@@ -536,6 +547,9 @@ export function GroupCallProvider({
 
                 incomingCall,
                 declineCall,
+
+                isMinimized,
+                setIsMinimized
             }}
         >
             <IncomingGroupCall />

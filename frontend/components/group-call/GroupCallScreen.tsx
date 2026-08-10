@@ -12,9 +12,11 @@ import {
     Video,
     VideoOff,
     PhoneOff,
-    VolumeX
+    VolumeX,
+    Minimize2
 } from "lucide-react";
 import { useSocket } from "@/hooks/useSocket";
+import { GroupCallMini } from "./GroupCallMini";
 
 export function GroupCallScreen() {
     const {
@@ -23,6 +25,8 @@ export function GroupCallScreen() {
         conversationId,
         participants,
         leaveCall,
+        isMinimized,
+        setIsMinimized
     } = useGroupCall();
 
     const { socket } = useSocket();
@@ -42,6 +46,10 @@ export function GroupCallScreen() {
 
     if (!inCall) {
         return null;
+    }
+
+    if (isMinimized) {
+        return <GroupCallMini />;
     }
 
     const remoteEntries =
@@ -68,9 +76,15 @@ export function GroupCallScreen() {
                     </p>
                 </div>
 
-                <div className="rounded-full bg-white/10 px-3 py-1 text-xs text-white/70 backdrop-blur-md">
-                    Live
-                </div>
+                <button
+                    type="button"
+                    onClick={() => setIsMinimized(true)}
+                    className="flex size-9 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-white/20"
+                    aria-label="Minimize call"
+                    title="Minimize call"
+                >
+                    <Minimize2 className="size-4" />
+                </button>
             </div>
 
             {/* Video grid */}
@@ -119,8 +133,8 @@ export function GroupCallScreen() {
                             <div className="absolute bottom-2 left-2 flex items-center gap-2 rounded-lg bg-black/60 px-2.5 py-1.5 text-xs font-medium text-white backdrop-blur-md sm:bottom-3 sm:left-3 sm:px-3 sm:py-1.5 sm:text-sm">
                                 <span
                                     className={`size-1.5 rounded-full ${isMuted
-                                            ? "bg-red-400"
-                                            : "bg-green-400"
+                                        ? "bg-red-400"
+                                        : "bg-green-400"
                                         }`}
                                 />
 
