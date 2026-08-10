@@ -11,22 +11,28 @@ export function VideoTile({
     stream,
     muted = false,
 }: VideoTileProps) {
-
-    const videoRef = useRef<HTMLVideoElement>(null);
+    const videoRef =
+        useRef<HTMLVideoElement>(null);
 
     useEffect(() => {
-        if (!videoRef.current) {
+        const video = videoRef.current;
+
+        if (!video) {
             return;
         }
 
-        videoRef.current.srcObject =
-            stream;
+        video.srcObject = stream;
+
+        // Explicitly attempt playback because
+        // some browsers may delay autoplay.
+        video.play().catch(() => {
+            // Autoplay may be blocked by the browser.
+            // The muted local video should normally
+            // still autoplay.
+        });
 
         return () => {
-            if (videoRef.current) {
-                videoRef.current.srcObject =
-                    null;
-            }
+            video.srcObject = null;
         };
     }, [stream]);
 
@@ -36,7 +42,9 @@ export function VideoTile({
             autoPlay
             playsInline
             muted={muted}
-            className="h-full w-full object-cover"
+            disablePictureInPicture
+            controls={false}
+            className="h-full w-full object-cover object-center"
         />
     );
 }

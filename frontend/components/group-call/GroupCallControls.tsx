@@ -22,10 +22,11 @@ export function GroupCallControls({
             <button
                 type="button"
                 onClick={leaveCall}
-                className="rounded-full bg-red-600 p-2 text-white"
+                className="flex size-9 items-center justify-center rounded-full bg-red-600 text-white transition hover:bg-red-700"
                 title="Leave group call"
+                aria-label="Leave group call"
             >
-                <Phone className="size-5" />
+                <Phone className="size-4" />
             </button>
         );
     }
@@ -40,8 +41,9 @@ export function GroupCallControls({
                         "voice"
                     )
                 }
-                className="rounded-full p-2 hover:bg-muted"
+                className="flex size-9 items-center justify-center rounded-full text-muted-foreground transition hover:bg-muted hover:text-foreground"
                 title="Group voice call"
+                aria-label="Start group voice call"
             >
                 <Phone className="size-5" />
             </button>
@@ -54,8 +56,9 @@ export function GroupCallControls({
                         "video"
                     )
                 }
-                className="rounded-full p-2 hover:bg-muted"
+                className="flex size-9 items-center justify-center rounded-full text-muted-foreground transition hover:bg-muted hover:text-foreground"
                 title="Group video call"
+                aria-label="Start group video call"
             >
                 <Video className="size-5" />
             </button>

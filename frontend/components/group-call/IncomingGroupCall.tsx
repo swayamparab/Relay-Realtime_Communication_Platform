@@ -1,6 +1,6 @@
 "use client";
 
-import { Phone, Video } from "lucide-react";
+import { Phone, Video, X } from "lucide-react";
 
 import { useGroupCall } from "@/hooks/group-call/useGroupCall";
 
@@ -19,30 +19,49 @@ export function IncomingGroupCall() {
         incomingCall.type === "video";
 
     return (
-        <div className="fixed right-4 top-4 z-[100] w-80 rounded-xl border bg-background p-4 shadow-xl">
+        <div className="fixed right-4 top-4 z-[100] w-[calc(100%-2rem)] max-w-sm overflow-hidden rounded-2xl border border-border bg-background/95 p-4 shadow-2xl backdrop-blur-xl sm:right-6 sm:top-6">
+            {/* Header */}
             <div className="flex items-center gap-3">
-                <div className="rounded-full bg-muted p-3">
+                <div className="flex size-12 shrink-0 items-center justify-center rounded-full bg-primary/10">
                     {isVideo ? (
-                        <Video className="size-5" />
+                        <Video className="size-5 text-primary" />
                     ) : (
-                        <Phone className="size-5" />
+                        <Phone className="size-5 text-primary" />
                     )}
                 </div>
 
-                <div>
+                <div className="min-w-0 flex-1">
                     <p className="font-semibold">
                         Incoming group call
                     </p>
 
                     <p className="text-sm text-muted-foreground">
                         {isVideo
-                            ? "Video call"
-                            : "Voice call"}
+                            ? "Group video call"
+                            : "Group voice call"}
                     </p>
                 </div>
+
+                <button
+                    type="button"
+                    onClick={declineCall}
+                    className="flex size-8 items-center justify-center rounded-full text-muted-foreground transition hover:bg-muted hover:text-foreground"
+                    aria-label="Dismiss call"
+                >
+                    <X className="size-4" />
+                </button>
             </div>
 
-            <div className="mt-4 flex gap-2">
+            {/* Actions */}
+            <div className="mt-4 grid grid-cols-2 gap-2">
+                <button
+                    type="button"
+                    onClick={declineCall}
+                    className="rounded-xl bg-muted px-4 py-2.5 text-sm font-medium transition hover:bg-muted/80"
+                >
+                    Decline
+                </button>
+
                 <button
                     type="button"
                     onClick={() =>
@@ -51,17 +70,9 @@ export function IncomingGroupCall() {
                             incomingCall.type
                         )
                     }
-                    className="flex-1 rounded-md bg-green-600 px-3 py-2 text-sm text-white"
+                    className="rounded-xl bg-green-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-green-700"
                 >
                     Join
-                </button>
-
-                <button
-                    type="button"
-                    onClick={declineCall}
-                    className="flex-1 rounded-md bg-red-600 px-3 py-2 text-sm text-white"
-                >
-                    Decline
                 </button>
             </div>
         </div>

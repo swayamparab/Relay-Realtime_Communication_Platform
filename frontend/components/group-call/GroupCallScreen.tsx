@@ -40,21 +40,30 @@ export function GroupCallScreen() {
     const remoteEntries =
         Array.from(remoteStreams.entries());
 
+    const isAlone =
+        participants.length === 1;
+
     return (
         <div className="fixed inset-0 z-50 flex min-h-0 flex-col bg-black">
 
             {/* Header */}
-            <div className="shrink-0 px-4 py-3 text-white sm:px-6 sm:py-4">
-                <h2 className="text-base font-semibold capitalize sm:text-lg">
-                    Group {callType} call
-                </h2>
+            <div className="flex shrink-0 items-center justify-between px-4 py-3 text-white sm:px-6 sm:py-4">
+                <div>
+                    <h2 className="text-base font-semibold capitalize sm:text-lg">
+                        Group {callType} call
+                    </h2>
 
-                <p className="text-xs text-white/60 sm:text-sm">
-                    {participants.length}{" "}
-                    {participants.length === 1
-                        ? "participant"
-                        : "participants"}
-                </p>
+                    <p className="mt-0.5 text-xs text-white/60 sm:text-sm">
+                        {participants.length}{" "}
+                        {participants.length === 1
+                            ? "participant"
+                            : "participants"}
+                    </p>
+                </div>
+
+                <div className="rounded-full bg-white/10 px-3 py-1 text-xs text-white/70 backdrop-blur-md">
+                    Live
+                </div>
             </div>
 
             {/* Video grid */}
@@ -66,31 +75,38 @@ export function GroupCallScreen() {
                         min-h-0
                         gap-2
                         sm:gap-3
-
                         ${participants.length <= 1
-                            ? "grid-cols-1"
+                            ? "grid-cols-1 grid-rows-1"
                             : participants.length === 2
-                                ? "grid-cols-2"
+                                ? "grid-cols-2 grid-rows-1"
                                 : participants.length === 3
                                     ? "grid-cols-2 grid-rows-2"
                                     : participants.length === 4
                                         ? "grid-cols-2 grid-rows-2"
-                                        : "grid-cols-2 grid-rows-3"
+                                        : "grid-cols-2 grid-rows-3 lg:grid-cols-3 lg:grid-rows-2"
                         }
                     `}
                 >
-
                     {/* Local user */}
                     {localStream && (
-                        <div className="relative min-h-0 overflow-hidden rounded-xl bg-zinc-900 ring-1 ring-white/10 sm:rounded-2xl">
+                        <div
+                            className={`group relative min-h-0 overflow-hidden rounded-xl bg-zinc-900 ring-1 ring-white/10 transition duration-200 hover:ring-white/20 sm:rounded-2xl ${isAlone
+                                ? "mx-auto w-full max-w-4xl"
+                                : ""
+                                }`}
+                        >
                             <VideoTile
                                 stream={localStream}
                                 muted
                             />
 
-                            <span className="absolute bottom-2 left-2 rounded-lg bg-black/60 px-2 py-1 text-xs font-medium text-white backdrop-blur-md sm:bottom-3 sm:left-3 sm:px-3 sm:py-1.5 sm:text-sm">
-                                You
-                            </span>
+                            <div className="absolute bottom-2 left-2 flex items-center gap-2 rounded-lg bg-black/60 px-2.5 py-1.5 text-xs font-medium text-white backdrop-blur-md sm:bottom-3 sm:left-3 sm:px-3 sm:py-1.5 sm:text-sm">
+                                <span className="size-1.5 rounded-full bg-green-400" />
+
+                                <span>
+                                    You
+                                </span>
+                            </div>
                         </div>
                     )}
 
@@ -100,7 +116,8 @@ export function GroupCallScreen() {
                             const participant =
                                 participants.find(
                                     (participant) =>
-                                        participant.id === userId
+                                        participant.id ===
+                                        userId
                                 );
 
                             const isThirdParticipant =
@@ -110,19 +127,23 @@ export function GroupCallScreen() {
                             return (
                                 <div
                                     key={userId}
-                                    className={`relative min-h-0 overflow-hidden rounded-xl bg-zinc-900 ring-1 ring-white/10 sm:rounded-2xl ${isThirdParticipant
-                                            ? "col-span-2"
-                                            : ""
+                                    className={`group relative min-h-0 overflow-hidden rounded-xl bg-zinc-900 ring-1 ring-white/10 transition duration-200 hover:ring-white/20 sm:rounded-2xl ${isThirdParticipant
+                                        ? "col-span-2"
+                                        : ""
                                         }`}
                                 >
                                     <VideoTile
                                         stream={stream}
                                     />
 
-                                    <span className="absolute bottom-2 left-2 rounded-lg bg-black/60 px-2 py-1 text-xs font-medium text-white backdrop-blur-md sm:bottom-3 sm:left-3 sm:px-3 sm:py-1.5 sm:text-sm">
-                                        {participant?.username ??
-                                            "Unknown"}
-                                    </span>
+                                    <div className="absolute bottom-2 left-2 flex items-center gap-2 rounded-lg bg-black/60 px-2.5 py-1.5 text-xs font-medium text-white backdrop-blur-md sm:bottom-3 sm:left-3 sm:px-3 sm:py-1.5 sm:text-sm">
+                                        <span className="size-1.5 rounded-full bg-green-400" />
+
+                                        <span>
+                                            {participant?.username ??
+                                                "Unknown"}
+                                        </span>
+                                    </div>
                                 </div>
                             );
                         }
@@ -131,7 +152,7 @@ export function GroupCallScreen() {
             </div>
 
             {/* Controls */}
-            <div className="shrink-0 flex items-center justify-center gap-3 px-4 py-4 sm:gap-4 sm:py-5">
+            <div className="flex shrink-0 items-center justify-center gap-3 border-t border-white/10 bg-black/80 px-4 py-4 backdrop-blur-md sm:gap-4 sm:py-5">
 
                 {/* Microphone */}
                 <button
@@ -148,7 +169,15 @@ export function GroupCallScreen() {
                             (prev) => !prev
                         );
                     }}
-                    className="flex size-12 items-center justify-center rounded-full bg-zinc-800 text-white transition hover:bg-zinc-700 sm:size-14"
+                    className={`flex size-12 items-center justify-center rounded-full text-white transition sm:size-14 ${isMuted
+                        ? "bg-white text-black hover:bg-zinc-200"
+                        : "bg-zinc-800 hover:bg-zinc-700"
+                        }`}
+                    aria-label={
+                        isMuted
+                            ? "Unmute microphone"
+                            : "Mute microphone"
+                    }
                 >
                     {isMuted ? (
                         <MicOff className="size-5 sm:size-6" />
@@ -176,7 +205,15 @@ export function GroupCallScreen() {
                                     !prev
                             );
                         }}
-                        className="flex size-12 items-center justify-center rounded-full bg-zinc-800 text-white transition hover:bg-zinc-700 sm:size-14"
+                        className={`flex size-12 items-center justify-center rounded-full text-white transition sm:size-14 ${isCameraOff
+                            ? "bg-white text-black hover:bg-zinc-200"
+                            : "bg-zinc-800 hover:bg-zinc-700"
+                            }`}
+                        aria-label={
+                            isCameraOff
+                                ? "Turn camera on"
+                                : "Turn camera off"
+                        }
                     >
                         {isCameraOff ? (
                             <VideoOff className="size-5 sm:size-6" />
@@ -191,6 +228,7 @@ export function GroupCallScreen() {
                     type="button"
                     onClick={leaveCall}
                     className="flex size-12 items-center justify-center rounded-full bg-red-600 text-white transition hover:bg-red-700 sm:size-14"
+                    aria-label="Leave call"
                 >
                     <PhoneOff className="size-5 sm:size-6" />
                 </button>
