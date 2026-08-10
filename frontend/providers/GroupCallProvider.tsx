@@ -73,6 +73,8 @@ export function GroupCallProvider({
         handleIceCandidate,
         hasPeerConnection,
         cleanupWebRTC,
+        setRemoteVideoStates,
+        setRemoteMuteStates
     } = useGroupWebRTC();
 
     const [inCall, setInCall] =
@@ -157,7 +159,7 @@ export function GroupCallProvider({
                     },
                 ];
             });
-            
+
             if (hasPeerConnection(userId)) {
                 return;
             }
@@ -329,6 +331,44 @@ export function GroupCallProvider({
         cleanupCall();
     }, [cleanupCall]);
 
+    const onRemoteCameraState = useCallback(
+        ({
+            userId,
+            enabled,
+        }: {
+            userId: string;
+            enabled: boolean;
+        }) => {
+            setRemoteVideoStates((prev) => {
+                const next = new Map(prev);
+
+                next.set(userId, enabled);
+
+                return next;
+            });
+        },
+        [setRemoteVideoStates]
+    );
+
+    const onRemoteMuteState = useCallback(
+        ({
+            userId,
+            muted,
+        }: {
+            userId: string;
+            muted: boolean;
+        }) => {
+            setRemoteMuteStates((prev) => {
+                const next = new Map(prev);
+
+                next.set(userId, muted);
+
+                return next;
+            });
+        },
+        [setRemoteMuteStates]
+    );
+
     useGroupCallEvents({
         onUserJoined,
         onUserLeft,
@@ -337,6 +377,8 @@ export function GroupCallProvider({
         onAnswer,
         onIceCandidate,
         onIncomingCall,
+        onRemoteCameraState,
+        onRemoteMuteState
     });
 
     const startCall = useCallback(

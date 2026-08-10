@@ -39,6 +39,16 @@ type Props = {
         callerId: string;
         type: "voice" | "video";
     }) => void;
+
+    onRemoteCameraState: (data: {
+        userId: string;
+        enabled: boolean;
+    }) => void;
+
+    onRemoteMuteState: (data: {
+        userId: string;
+        muted: boolean;
+    }) => void;
 };
 
 export function useGroupCallEvents({
@@ -48,7 +58,9 @@ export function useGroupCallEvents({
     onOffer,
     onAnswer,
     onIceCandidate,
-    onIncomingCall
+    onIncomingCall,
+    onRemoteCameraState,
+    onRemoteMuteState
 }: Props) {
     const { socket } = useSocket();
 
@@ -88,6 +100,16 @@ export function useGroupCallEvents({
             onIncomingCall
         );
 
+        socket.on(
+            "group_call:remote_camera_state",
+            onRemoteCameraState
+        );
+
+        socket.on(
+            "group_call:remote_mute_state",
+            onRemoteMuteState
+        );
+
         return () => {
             socket.off(
                 "group_call:user_joined",
@@ -123,6 +145,16 @@ export function useGroupCallEvents({
                 "group_call:incoming",
                 onIncomingCall
             );
+
+            socket.off(
+                "group_call:remote_camera_state",
+                onRemoteCameraState
+            );
+
+            socket.off(
+                "group_call:remote_mute_state",
+                onRemoteMuteState
+            );
         };
     }, [
         socket,
@@ -132,6 +164,8 @@ export function useGroupCallEvents({
         onOffer,
         onAnswer,
         onIceCandidate,
-        onIncomingCall
+        onIncomingCall,
+        onRemoteCameraState,
+        onRemoteMuteState
     ]);
 }

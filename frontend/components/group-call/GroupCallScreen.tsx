@@ -12,19 +12,26 @@ import {
     Video,
     VideoOff,
     PhoneOff,
+    VolumeX
 } from "lucide-react";
+import { useSocket } from "@/hooks/useSocket";
 
 export function GroupCallScreen() {
     const {
         inCall,
         callType,
+        conversationId,
         participants,
         leaveCall,
     } = useGroupCall();
 
+    const { socket } = useSocket();
+
     const {
         localStream,
         remoteStreams,
+        remoteVideoStates,
+        remoteMuteStates
     } = useGroupWebRTC();
 
     const [isMuted, setIsMuted] =
@@ -95,17 +102,35 @@ export function GroupCallScreen() {
                                 : ""
                                 }`}
                         >
-                            <VideoTile
-                                stream={localStream}
-                                muted
-                            />
+
+                            {isCameraOff ? (
+                                <div className="flex h-full w-full items-center justify-center bg-zinc-800">
+                                    <div className="flex size-20 items-center justify-center rounded-full bg-zinc-700 text-2xl font-semibold text-white sm:size-24 sm:text-3xl">
+                                        You
+                                    </div>
+                                </div>
+                            ) : (
+                                <VideoTile
+                                    stream={localStream}
+                                    muted
+                                />
+                            )}
 
                             <div className="absolute bottom-2 left-2 flex items-center gap-2 rounded-lg bg-black/60 px-2.5 py-1.5 text-xs font-medium text-white backdrop-blur-md sm:bottom-3 sm:left-3 sm:px-3 sm:py-1.5 sm:text-sm">
-                                <span className="size-1.5 rounded-full bg-green-400" />
+                                <span
+                                    className={`size-1.5 rounded-full ${isMuted
+                                            ? "bg-red-400"
+                                            : "bg-green-400"
+                                        }`}
+                                />
 
                                 <span>
                                     You
                                 </span>
+
+                                {isMuted && (
+                                    <MicOff className="size-3.5 text-red-400 sm:size-4" />
+                                )}
                             </div>
                         </div>
                     )}
@@ -120,6 +145,12 @@ export function GroupCallScreen() {
                                         userId
                                 );
 
+                            const isCameraOff =
+                                remoteVideoStates.get(userId) === false;
+
+                            const isMuted =
+                                remoteMuteStates.get(userId) === true;
+
                             const isThirdParticipant =
                                 participants.length === 3 &&
                                 index === 1;
@@ -132,17 +163,33 @@ export function GroupCallScreen() {
                                         : ""
                                         }`}
                                 >
-                                    <VideoTile
-                                        stream={stream}
-                                    />
+                                    {isCameraOff ? (
+                                        <div className="flex h-full w-full items-center justify-center bg-zinc-800">
+                                            <div className="flex size-20 items-center justify-center rounded-full bg-zinc-700 text-2xl font-semibold text-white sm:size-24 sm:text-3xl">
+                                                {(
+                                                    participant?.username ??
+                                                    "Unknown"
+                                                )
+                                                    .charAt(0)
+                                                    .toUpperCase()}
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <VideoTile
+                                            stream={stream}
+                                        />
+                                    )}
 
                                     <div className="absolute bottom-2 left-2 flex items-center gap-2 rounded-lg bg-black/60 px-2.5 py-1.5 text-xs font-medium text-white backdrop-blur-md sm:bottom-3 sm:left-3 sm:px-3 sm:py-1.5 sm:text-sm">
                                         <span className="size-1.5 rounded-full bg-green-400" />
 
                                         <span>
-                                            {participant?.username ??
-                                                "Unknown"}
+                                            {participant?.username ?? "Unknown"}
                                         </span>
+
+                                        {isMuted && (
+                                            <VolumeX className="size-3.5 text-red-400 sm:size-4" />
+                                        )}
                                     </div>
                                 </div>
                             );
@@ -158,16 +205,25 @@ export function GroupCallScreen() {
                 <button
                     type="button"
                     onClick={() => {
+                        const nextMuted = !isMuted;
+
                         localStream
                             ?.getAudioTracks()
                             .forEach((track) => {
-                                track.enabled =
-                                    !track.enabled;
+                                track.enabled = !nextMuted;
                             });
 
-                        setIsMuted(
-                            (prev) => !prev
-                        );
+                        setIsMuted(nextMuted);
+
+                        if (conversationId) {
+                            socket.emit(
+                                "group_call:mute_state",
+                                {
+                                    conversationId,
+                                    muted: nextMuted,
+                                }
+                            );
+                        }
                     }}
                     className={`flex size-12 items-center justify-center rounded-full text-white transition sm:size-14 ${isMuted
                         ? "bg-white text-black hover:bg-zinc-200"
@@ -191,19 +247,29 @@ export function GroupCallScreen() {
                     <button
                         type="button"
                         onClick={() => {
+                            const nextCameraOff =
+                                !isCameraOff;
+
                             localStream
                                 ?.getVideoTracks()
-                                .forEach(
-                                    (track) => {
-                                        track.enabled =
-                                            !track.enabled;
-                                    }
-                                );
+                                .forEach((track) => {
+                                    track.enabled =
+                                        !nextCameraOff;
+                                });
 
                             setIsCameraOff(
-                                (prev) =>
-                                    !prev
+                                nextCameraOff
                             );
+
+                            if (conversationId) {
+                                socket.emit(
+                                    "group_call:camera_state",
+                                    {
+                                        conversationId,
+                                        enabled: !nextCameraOff,
+                                    }
+                                );
+                            }
                         }}
                         className={`flex size-12 items-center justify-center rounded-full text-white transition sm:size-14 ${isCameraOff
                             ? "bg-white text-black hover:bg-zinc-200"

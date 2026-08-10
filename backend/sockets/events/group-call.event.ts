@@ -429,4 +429,104 @@ export function registerGroupCallEvents(
             }
         }
     );
+
+    socket.on(
+        "group_call:camera_state",
+        async (
+            {
+                conversationId,
+                enabled,
+            }: {
+                conversationId: string;
+                enabled: boolean;
+            }
+        ) => {
+            try {
+                const allowed =
+                    await isParticipant(
+                        socket.userId,
+                        conversationId
+                    );
+
+                if (!allowed) {
+                    return;
+                }
+
+                const activeCall =
+                    await getActiveGroupCall(
+                        conversationId
+                    );
+
+                if (!activeCall) {
+                    return;
+                }
+
+                socket
+                    .to(`group-call:${conversationId}`)
+                    .emit(
+                        "group_call:remote_camera_state",
+                        {
+                            userId:
+                                socket.userId,
+                            enabled,
+                        }
+                    );
+            } catch (error) {
+                console.error(
+                    "Failed to broadcast group camera state:",
+                    error
+                );
+            }
+        }
+    );
+
+    socket.on(
+        "group_call:mute_state",
+        async (
+            {
+                conversationId,
+                muted,
+            }: {
+                conversationId: string;
+                muted: boolean;
+            }
+        ) => {
+            try {
+                const allowed =
+                    await isParticipant(
+                        socket.userId,
+                        conversationId
+                    );
+
+                if (!allowed) {
+                    return;
+                }
+
+                const activeCall =
+                    await getActiveGroupCall(
+                        conversationId
+                    );
+
+                if (!activeCall) {
+                    return;
+                }
+
+                socket
+                    .to(`group-call:${conversationId}`)
+                    .emit(
+                        "group_call:remote_mute_state",
+                        {
+                            userId:
+                                socket.userId,
+                            muted,
+                        }
+                    );
+            } catch (error) {
+                console.error(
+                    "Failed to broadcast group mute state:",
+                    error
+                );
+            }
+        }
+    );
 }

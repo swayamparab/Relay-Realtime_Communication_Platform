@@ -15,6 +15,18 @@ type GroupWebRTCContextType = {
 
     remoteStreams: Map<string, MediaStream>;
 
+    remoteVideoStates: Map<string, boolean>;
+
+    setRemoteVideoStates: React.Dispatch<
+        React.SetStateAction<Map<string, boolean>>
+    >;
+
+    remoteMuteStates: Map<string, boolean>;
+
+    setRemoteMuteStates: React.Dispatch<
+        React.SetStateAction<Map<string, boolean>>
+    >;
+
     setConversationId: (
         conversationId: string | null
     ) => void;
@@ -53,6 +65,8 @@ type GroupWebRTCContextType = {
     cleanupWebRTC: () => void;
 };
 
+type RemoteVideoState = Map<string, boolean>;
+
 export const GroupWebRTCContext =
     createContext<GroupWebRTCContextType | null>(
         null
@@ -72,6 +86,12 @@ export function GroupWebRTCProvider({
         useState<Map<string, MediaStream>>(
             new Map()
         );
+
+    const [remoteVideoStates, setRemoteVideoStates] =
+        useState<RemoteVideoState>(new Map());
+
+    const [remoteMuteStates, setRemoteMuteStates] =
+        useState<Map<string, boolean>>(new Map());
 
     const localStreamRef =
         useRef<MediaStream | null>(null);
@@ -541,8 +561,11 @@ export function GroupWebRTCProvider({
                 return new Map();
             });
 
-            conversationIdRef.current =
-                null;
+            setRemoteVideoStates(new Map());
+
+            setRemoteMuteStates(new Map());
+
+            conversationIdRef.current = null;
         },
         []
     );
@@ -550,23 +573,20 @@ export function GroupWebRTCProvider({
     const value = useMemo(
         () => ({
             localStream,
-
             remoteStreams,
+            remoteVideoStates,
+            setRemoteVideoStates,
+            remoteMuteStates,
+            setRemoteMuteStates,
+            getLocalStream,
 
             setConversationId,
 
-            getLocalStream,
-
             createPeerConnection,
-
             createOffer,
-
             handleOffer,
-
             handleAnswer,
-
             handleIceCandidate,
-
             hasPeerConnection,
 
             cleanupWebRTC,
@@ -574,6 +594,10 @@ export function GroupWebRTCProvider({
         [
             localStream,
             remoteStreams,
+            remoteVideoStates,
+            setRemoteVideoStates,
+            remoteMuteStates,
+            setRemoteMuteStates,
             setConversationId,
             getLocalStream,
             createPeerConnection,
