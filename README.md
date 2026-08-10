@@ -1,27 +1,36 @@
 # Relay - Real-Time Communication Platform
 
-A modern full-stack real-time one-to-one communication platform built with **Next.js**, **Express**, **PostgreSQL**, **Drizzle ORM**, **Socket.IO**, and **WebRTC**.
+A modern full-stack real-time communication platform built with **Next.js**, **Express**, **PostgreSQL**, **Drizzle ORM**, **Redis**, **Socket.IO**, and **WebRTC**.
 
-Relay is a production-style real-time communication platform featuring secure authentication, one-to-one messaging, group chats with role-based administration, media sharing, voice & video calling, and live synchronization powered by Socket.IO and React Query.
+Relay is a production-style communication platform featuring secure authentication, one-to-one messaging, group chats with role-based administration, media sharing, voice and video calling, group voice and video calling, presence, caching, rate limiting, and live synchronization powered by Socket.IO and React Query.
 
 ---
 
-## Architecture
+# Architecture
 
-- **Frontend:** Next.js 15 + React + TypeScript (Vercel)
-- **Backend:** Express.js + Socket.IO + TypeScript (Render)
+- **Frontend:** Next.js 15 + React + TypeScript
+- **Backend:** Express.js + Socket.IO + TypeScript
 - **Database:** PostgreSQL + Drizzle ORM
+- **Cache & Rate Limiting:** Redis
 - **Media Storage:** Cloudinary
 - **Real-Time Communication:** Socket.IO
-- **Voice & Video Calls:** WebRTC (STUN)
+- **Voice & Video Calls:** WebRTC
+- **NAT Traversal:** STUN
 
-### Architecture Highlights
+## Architecture Highlights
 
 - Next.js frontend deployed on Vercel
 - Express + Socket.IO backend deployed on Render
 - API & WebSocket traffic proxied through Vercel rewrites (`/api` and `/socket.io`)
 - Same-origin architecture for secure HttpOnly cookie authentication
-- Cursor-based message pagination for scalable conversations
+- Layered backend architecture
+- Service-based business logic
+- Cursor-based message pagination
+- Redis-based caching
+- Redis-backed rate limiting
+- WebRTC peer-to-peer media communication
+- Socket.IO-based WebRTC signaling
+- Room-based real-time communication
 
 ---
 
@@ -38,7 +47,7 @@ Relay is a production-style real-time communication platform featuring secure au
 
 ## Messaging
 
-- One-to-one Real-Time messaging
+- One-to-one real-time messaging
 - Text messages
 - Image messages
 - Video messages
@@ -55,13 +64,11 @@ Relay is a production-style real-time communication platform featuring secure au
 - Cursor-based infinite scrolling
 - Automatic scroll position restoration
 - Message search
-- Infinite scrolling
-- Cursor pagination
-- Live message editing
-- Live message deletion
 - Reply previews
 - Media previews
-- Auto read synchronization
+- Automatic read synchronization
+- Live message editing
+- Live message deletion
 
 ---
 
@@ -77,6 +84,7 @@ Relay is a production-style real-time communication platform featuring secure au
 - Live unread count updates
 - Live typing indicators
 - Read receipt synchronization
+- Online user synchronization
 
 ---
 
@@ -123,36 +131,73 @@ Relay is a production-style real-time communication platform featuring secure au
 
 ---
 
-## Voice Calling
+# Voice Calling
+
+## One-to-One Voice Calling
 
 - Real-time voice calling
-- Busy state handling
 - Incoming call screen
 - Outgoing call screen
+- Busy state handling
 - Call timeout
 - Call duration
 - Mute microphone
 - Ongoing call card
 - ICE candidate exchange
 - WebRTC signaling through Socket.IO
+- Call state synchronization
+
+## Group Voice Calling
+
+- Multi-participant voice calls
+- Up to 6 participants
+- Real-time participant synchronization
+- Join / leave group calls
+- Active call state management
+- Group call participant limits
+- Mute microphone
+- Remote mute state synchronization
+- Incoming group call notifications
+- Call termination synchronization
+- WebRTC mesh peer connections
 
 ---
 
-## Video Calling
+# Video Calling
+
+## One-to-One Video Calling
 
 - Real-time video calls
 - Camera toggle
-- Camera switching (mobile)
+- Camera switching on mobile
 - Mute microphone
 - Remote camera status
 - Camera-off placeholder
-- Picture-in-Picture (PiP) mode support
+- Picture-in-Picture support
 - Draggable floating video window
 - Fullscreen / Restore
 - Responsive mobile experience
-- Draggable video window
-- Camera switching
 - Camera state synchronization
+
+## Group Video Calling
+
+- Multi-participant video calls
+- Up to 6 participants
+- Responsive participant grid
+- Desktop and mobile layouts
+- Real-time participant synchronization
+- Camera toggle
+- Remote camera state synchronization
+- Camera-off participant avatars
+- Mute microphone
+- Remote mute indicators
+- Participant usernames
+- Incoming group call notifications
+- Join / leave group calls
+- Group call termination
+- WebRTC peer-to-peer media
+- Socket.IO signaling
+- STUN-based connection establishment
 
 ---
 
@@ -174,33 +219,40 @@ Relay is a production-style real-time communication platform featuring secure au
 - Live unread counts
 - Live online users
 - Last seen updates
-- Typing indicators
 - Read receipts
 - Live unread counters
 
 ---
 
-## User Experience
+# User Experience
 
 - Responsive UI
 - Desktop & Mobile support
+- Mobile-first design
 - React Query caching
 - Modern UI with Tailwind CSS
 - shadcn/ui components
 - Toast notifications
 - Optimistic updates
+- Responsive calling interface
+- Real-time call controls
+- Participant status indicators
 
 ---
 
-## Performance
+# Performance
 
 - Cursor-based pagination
 - Infinite message loading
 - React Query caching
+- Redis-based caching
+- Redis-backed rate limiting
 - Optimistic UI updates
 - Cache synchronization via Socket.IO
 - Minimal API refetching
 - Efficient room-based broadcasts
+- Modular React hooks
+- WebRTC peer-to-peer media communication
 
 ---
 
@@ -219,6 +271,7 @@ Relay is a production-style real-time communication platform featuring secure au
 - React Hook Form
 - Zod
 - Sonner
+- Lucide React
 
 ---
 
@@ -228,79 +281,22 @@ Relay is a production-style real-time communication platform featuring secure au
 - TypeScript
 - PostgreSQL
 - Drizzle ORM
+- Redis
 - Socket.IO
-- WebRTC
+- WebRTC signaling
 - JWT
 - bcrypt
 
 ---
 
-## Screenshots
+## Infrastructure & Services
 
-_Add screenshots here._
-
----
-
-# Getting Started
-
-## Clone Repository
-
-```bash
-git clone https://github.com/swayamparab/Relay-Realtime_Communication_Platform.git
-```
-
----
-
-## Install Dependencies
-
-### Frontend
-
-```bash
-npm install
-```
-
-### Backend
-
-```bash
-npm install
-```
-
----
-
-## Environment Variables
-
-### Frontend
-
-```env
-NEXT_PUBLIC_API_URL=
-```
-
-### Backend
-
-```env
-DATABASE_URL=
-JWT_SECRET=
-CLIENT_URL=
-CLOUDINARY_CLOUD_NAME=
-CLOUDINARY_API_KEY=
-CLOUDINARY_API_SECRET=
-```
-
----
-
-## Run Development Server
-
-### Backend
-
-```bash
-npm run dev
-```
-
-### Frontend
-
-```bash
-npm run dev
-```
+- Vercel
+- Render
+- Neon PostgreSQL
+- Redis
+- Cloudinary
+- STUN
 
 ---
 
@@ -311,6 +307,11 @@ npm run dev
 - Socket.IO event-driven architecture
 - Room-based real-time communication
 - WebRTC peer-to-peer calling
+- WebRTC mesh architecture for group calls
+- Socket.IO signaling for WebRTC
+- STUN-based NAT traversal
+- Redis caching
+- Redis-based API rate limiting
 - Cursor-based infinite pagination
 - React Query cache synchronization
 - Optimistic UI updates
@@ -327,6 +328,7 @@ npm run dev
 
 # Project Structure
 
+```text
 frontend/
 ├── app/
 ├── components/
@@ -344,28 +346,3 @@ backend/
 ├── db/
 ├── services/
 └── lib/
-
----
-
-# Future Improvements
-
-- TURN server for production-grade WebRTC
-- Screen sharing
-- End-to-end encryption
-- Push notifications
-- PWA support
-- Message reactions
-- Pinned messages
-- Polls
-- Voice/video group calls
-- Message forwarding
-- User blocking
-- Archived chats
-
----
-
-# Author
-
-**Swayam Parab**
-
-GitHub: https://github.com/swayamparab/Relay-Realtime_Communication_Platform
