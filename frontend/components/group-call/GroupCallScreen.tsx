@@ -2,19 +2,25 @@
 
 import { useState } from "react";
 import { VideoTile } from "./VideoTile";
+
 import { useGroupCall } from "@/hooks/group-call/useGroupCall";
+import { useGroupWebRTC } from "@/hooks/group-call/useGroupWebRTC";
 
 import { Mic, MicOff, Video, VideoOff, PhoneOff } from "lucide-react";
 
 export function GroupCallScreen() {
+
     const {
         inCall,
         callType,
         participants,
-        localStream,
-        remoteStreams,
         leaveCall,
     } = useGroupCall();
+
+    const {
+        localStream,
+        remoteStreams,
+    } = useGroupWebRTC();
 
     const [isMuted, setIsMuted] = useState(false);
     const [isCameraOff, setIsCameraOff] = useState(false);
