@@ -45,10 +45,15 @@ export function AddParticipantDialog({
                 user.id !== currentUser?.user.id
         ) ?? [];
 
-    function handleAdd(userId: string) {
-        console.log("Adding participant:", userId);
+    async function handleAdd(userId: string) {
+        // console.log("Adding participant:", userId);
 
-        addParticipantToCall(userId);
+        const success = await addParticipantToCall(userId);
+
+        if (success) {
+            setQuery("");
+            onOpenChange(false);
+        }
     }
 
     return (

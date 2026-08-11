@@ -2,7 +2,7 @@
 
 A modern full-stack real-time communication platform built with **Next.js**, **Express**, **PostgreSQL**, **Drizzle ORM**, **Redis**, **Socket.IO**, and **WebRTC**.
 
-Relay is a production-style communication platform featuring secure authentication, one-to-one messaging, group chats with role-based administration, media sharing, voice and video calling, group voice and video calling, presence, caching, rate limiting, and live synchronization powered by Socket.IO and React Query.
+Relay is a production-style communication platform featuring secure authentication, one-to-one messaging, group chats with role-based administration, media sharing, voice and video calling, group voice and video calling, dynamic 1-to-1 call promotion, participant invitations, presence, caching, rate limiting, and live synchronization powered by Socket.IO and React Query.
 
 ---
 
@@ -31,6 +31,12 @@ Relay is a production-style communication platform featuring secure authenticati
 - WebRTC peer-to-peer media communication
 - Socket.IO-based WebRTC signaling
 - Room-based real-time communication
+- Separate WebRTC architecture for one-to-one and group calls
+- WebRTC mesh architecture for multi-participant calls
+- Dynamic 1-to-1 → group call promotion
+- Reuse of existing microphone/camera MediaStream during call promotion
+- Per-participant RTCPeerConnection management for group calls
+- Runtime group-call participant and invitation state management
 
 ---
 
@@ -158,8 +164,12 @@ Relay is a production-style communication platform featuring secure authenticati
 - Mute microphone
 - Remote mute state synchronization
 - Incoming group call notifications
+- Participant invitations
+- Accept / decline group call invitations
 - Call termination synchronization
 - WebRTC mesh peer connections
+- Per-participant WebRTC peer connections
+- Dynamic 1-to-1 → group call promotion
 
 ---
 
@@ -193,11 +203,46 @@ Relay is a production-style communication platform featuring secure authenticati
 - Remote mute indicators
 - Participant usernames
 - Incoming group call notifications
+- Participant invitations
+- Accept / decline group call invitations
 - Join / leave group calls
 - Group call termination
+- Dynamic 1-to-1 → group call promotion
 - WebRTC peer-to-peer media
+- Per-participant WebRTC peer connections
 - Socket.IO signaling
 - STUN-based connection establishment
+- Local MediaStream reuse during call promotion
+
+---
+
+# Dynamic 1-to-1 → Group Call Promotion
+
+An active one-to-one voice or video call can be converted into a group call by inviting another conversation participant.
+
+The existing microphone/camera MediaStream is preserved during the transition, while the old one-to-one WebRTC peer connection is replaced by the group-call WebRTC architecture.
+
+## Promotion Flow
+
+1-to-1 Call
+    │
+    │ Add Participant
+    ▼
+group_call:promote
+    │
+    ▼
+Create Group Call
+    │
+    ├── Create group_calls record
+    ├── Move existing participants
+    ├── Join group-call Socket.IO room
+    └── Invite new participant
+              │
+              ▼
+       Participant accepts
+              │
+              ▼
+         Group Call
 
 ---
 
@@ -308,6 +353,13 @@ Relay is a production-style communication platform featuring secure authenticati
 - Room-based real-time communication
 - WebRTC peer-to-peer calling
 - WebRTC mesh architecture for group calls
+- Dynamic 1-to-1 → group call promotion
+- Persistent group-call records using PostgreSQL
+- Runtime group-call participant tracking
+- Group-call invitation state management
+- Reusable local MediaStream across call transitions
+- Per-participant RTCPeerConnection management
+- Group-call Socket.IO room architecture
 - Socket.IO signaling for WebRTC
 - STUN-based NAT traversal
 - Redis caching
@@ -324,16 +376,22 @@ Relay is a production-style communication platform featuring secure authenticati
 - Modular React hooks architecture
 - Responsive mobile-first UI
 
----
-
 # Project Structure
 
-```text
 frontend/
 ├── app/
 ├── components/
+│   ├── call/
+│   └── group-call/
 ├── hooks/
+│   ├── call/
+│   ├── group-call/
+│   └── webrtc/
 ├── providers/
+│   ├── CallProvider.tsx
+│   ├── GroupCallProvider.tsx
+│   ├── WebRTCProvider.tsx
+│   └── GroupWebRTCProvider.tsx
 ├── services/
 ├── lib/
 └── types/
@@ -341,8 +399,14 @@ frontend/
 backend/
 ├── modules/
 ├── sockets/
+│   ├── events/
+│   └── helpers/
+│       ├── active-calls.ts
+│       ├── group-call-state.ts
+│       └── group-call-invites.ts
 ├── middleware/
 ├── routes/
 ├── db/
 ├── services/
+│   └── group-call.service.ts
 └── lib/

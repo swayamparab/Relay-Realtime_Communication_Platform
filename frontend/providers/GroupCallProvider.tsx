@@ -9,11 +9,15 @@ import {
 import { toast } from "sonner";
 
 import { useSocket } from "@/hooks/useSocket";
+
 import { useGroupCallEvents } from "@/hooks/group-call/useGroupCallEvents";
 import { useGroupWebRTC } from "@/hooks/group-call/useGroupWebRTC";
 
+import { useWebRTC } from "@/hooks/webrtc/useWebRTC";
+
 import { GroupCallScreen } from "@/components/group-call/GroupCallScreen";
 import { IncomingGroupCall } from "@/components/group-call/IncomingGroupCall";
+
 import { useCurrentUser } from "@/hooks/user/useCurrentUser";
 
 type CallType = "voice" | "video";
@@ -82,10 +86,40 @@ export function GroupCallProvider({
         handleAnswer,
         handleIceCandidate,
         hasPeerConnection,
+        closePeerConnection,
         cleanupWebRTC,
         setRemoteVideoStates,
         setRemoteMuteStates,
+        adoptLocalStream,
     } = useGroupWebRTC();
+
+    /*
+     * Existing 1-to-1 WebRTC provider.
+     *
+     * We use this only during:
+     *
+     * 1-to-1 call
+     *      ↓
+     * promote
+     *      ↓
+     * group call
+     *
+     * The existing local stream is transferred
+     * into GroupWebRTCProvider.
+     */
+    const {
+        localStream: oneToOneLocalStream,
+        closePrimaryPeerConnection,
+    } = useWebRTC();
+
+    const { data: currentUser } =
+        useCurrentUser();
+
+    /*
+     * ============================================================
+     * STATE
+     * ============================================================
+     */
 
     const [inCall, setInCall] =
         useState(false);
@@ -104,8 +138,6 @@ export function GroupCallProvider({
 
     const [isMinimized, setIsMinimized] =
         useState(false);
-
-    const { data: currentUser } = useCurrentUser();
 
     /*
      * ============================================================
@@ -132,7 +164,7 @@ export function GroupCallProvider({
 
     /*
      * ============================================================
-     * DECLINE
+     * DECLINE INCOMING CALL
      * ============================================================
      */
 
@@ -142,7 +174,7 @@ export function GroupCallProvider({
 
     /*
      * ============================================================
-     * LEAVE
+     * LEAVE GROUP CALL
      * ============================================================
      */
 
@@ -165,8 +197,34 @@ export function GroupCallProvider({
 
     /*
      * ============================================================
-     * PROMOTED 1-TO-1 → GROUP
+     * PROMOTE 1-TO-1 → GROUP CALL
      * ============================================================
+     *
+     * This is the most important part.
+     *
+     * Existing flow:
+     *
+     *     WebRTCProvider
+     *          |
+     *          | localStream
+     *          ↓
+     *     1-to-1 call
+     *
+     * After promotion:
+     *
+     *     WebRTCProvider
+     *          |
+     *          | close primary peer
+     *          | KEEP localStream
+     *          ↓
+     *     GroupWebRTCProvider
+     *          |
+     *          ↓
+     *     group peers
+     *
+     * We MUST NOT call closePeerConnection()
+     * here because that would stop the microphone
+     * and camera.
      */
 
     const onCallPromoted = useCallback(
@@ -182,15 +240,70 @@ export function GroupCallProvider({
             participants: Participant[];
         }) => {
             /*
-             * Ignore calls from another conversation.
+             * If we are already inside another
+             * group call, ignore this event.
              */
             if (
-                conversationId &&
-                eventConversationId !==
-                conversationId
+                inCall &&
+                conversationId !==
+                eventConversationId
             ) {
                 return;
             }
+
+            /*
+             * ========================================================
+             * 1. Preserve the existing local stream
+             * ========================================================
+             */
+
+            const existingLocalStream =
+                oneToOneLocalStream;
+
+            if (!existingLocalStream) {
+                console.error(
+                    "Cannot promote call: existing 1-to-1 local stream is unavailable."
+                );
+
+                toast.error(
+                    "Unable to continue call."
+                );
+
+                return;
+            }
+
+            /*
+             * ========================================================
+             * 2. Close ONLY the old 1-to-1 peer
+             * ========================================================
+             *
+             * IMPORTANT:
+             *
+             * closePrimaryPeerConnection()
+             * does NOT stop localStream.
+             *
+             * This allows us to reuse the same
+             * microphone/camera tracks.
+             */
+
+            closePrimaryPeerConnection();
+
+            /*
+             * ========================================================
+             * 3. Give the existing stream to group WebRTC
+             * ========================================================
+             */
+
+            adoptLocalStream(
+                existingLocalStream,
+                eventConversationId
+            );
+
+            /*
+             * ========================================================
+             * 4. Update group call state
+             * ========================================================
+             */
 
             setConversationId(
                 eventConversationId
@@ -208,54 +321,70 @@ export function GroupCallProvider({
 
             setInCall(true);
 
+            setIncomingCall(null);
+
             /*
-             * Existing participants need to
-             * establish group peer connections.
+             * ========================================================
+             * 5. Establish group peer connections
+             * ========================================================
              *
-             * We don't create offers to ourselves.
+             * The group WebRTC provider uses deterministic
+             * user-ID ordering to decide who creates the offer.
+             *
+             * Therefore we can safely ask it to create offers
+             * for all other participants.
+             *
+             * Only the designated offerer will actually create
+             * an offer.
              */
+
+            const localUserId =
+                currentUser?.user.id;
+
+            if (!localUserId) {
+                console.warn(
+                    "Cannot establish promoted group peers: current user unavailable."
+                );
+
+                return;
+            }
 
             const otherParticipants =
                 promotedParticipants.filter(
                     (participant) =>
                         participant.id !==
-                        currentUser?.user.id
+                        localUserId
                 );
 
-            /*
-             * IMPORTANT:
-             *
-             * socket.id is the Socket.IO connection ID,
-             * NOT our application user ID.
-             *
-             * Therefore this list is only used as a
-             * fallback here. The actual user ID should
-             * ideally come from currentUser.
-             */
-
-            try {
-                for (const participant of
-                    otherParticipants) {
-                    if (
-                        !hasPeerConnection(
-                            participant.id
-                        )
-                    ) {
-                        await createOffer(
-                            participant.id
-                        );
-                    }
+            for (const participant of
+                otherParticipants) {
+                if (
+                    hasPeerConnection(
+                        participant.id
+                    )
+                ) {
+                    continue;
                 }
-            } catch (error) {
-                console.error(
-                    "Failed to establish promoted group call peers:",
-                    error
-                );
+
+                try {
+                    await createOffer(
+                        participant.id
+                    );
+                } catch (error) {
+                    console.error(
+                        "Failed to create promoted group peer:",
+                        participant.id,
+                        error
+                    );
+                }
             }
         },
         [
-            conversationId,
-            socket.id,
+            inCall,
+            oneToOneLocalStream,
+            closePrimaryPeerConnection,
+            adoptLocalStream,
+            currentUser?.user.id,
             setWebRTCConversationId,
             hasPeerConnection,
             createOffer,
@@ -297,9 +426,13 @@ export function GroupCallProvider({
             });
 
             /*
-             * Existing participants create
-             * an offer to the newly joined user.
+             * Existing participants create the
+             * WebRTC connection to the newly joined user.
+             *
+             * createOffer() itself determines whether
+             * this user is the designated offerer.
              */
+
             if (
                 hasPeerConnection(userId)
             ) {
@@ -333,6 +466,10 @@ export function GroupCallProvider({
         }: {
             userId: string;
         }) => {
+            /*
+             * Remove participant from UI.
+             */
+
             setParticipants((prev) =>
                 prev.filter(
                     (participant) =>
@@ -340,13 +477,19 @@ export function GroupCallProvider({
                         userId
                 )
             );
+
+            /*
+             * Close the WebRTC peer for this user.
+             */
+
+            closePeerConnection(userId);
         },
-        []
+        [closePeerConnection]
     );
 
     /*
      * ============================================================
-     * OFFER
+     * GROUP OFFER
      * ============================================================
      */
 
@@ -388,7 +531,7 @@ export function GroupCallProvider({
 
     /*
      * ============================================================
-     * ANSWER
+     * GROUP ANSWER
      * ============================================================
      */
 
@@ -430,7 +573,7 @@ export function GroupCallProvider({
 
     /*
      * ============================================================
-     * ICE
+     * GROUP ICE CANDIDATE
      * ============================================================
      */
 
@@ -478,7 +621,8 @@ export function GroupCallProvider({
 
     const onIncomingCall = useCallback(
         ({
-            conversationId,
+            conversationId:
+            eventConversationId,
             callerId,
             callerUsername,
             type,
@@ -488,7 +632,8 @@ export function GroupCallProvider({
             }
 
             setIncomingCall({
-                conversationId,
+                conversationId:
+                    eventConversationId,
                 callerId,
                 callerUsername,
                 type,
@@ -499,14 +644,15 @@ export function GroupCallProvider({
 
     /*
      * ============================================================
-     * INVITED INTO EXISTING CALL
+     * PARTICIPANT INVITATION
      * ============================================================
      */
 
     const onParticipantInvited =
         useCallback(
             ({
-                conversationId,
+                conversationId:
+                eventConversationId,
                 callerId,
                 callerUsername,
                 type,
@@ -516,7 +662,8 @@ export function GroupCallProvider({
                 }
 
                 setIncomingCall({
-                    conversationId,
+                    conversationId:
+                        eventConversationId,
                     callerId,
                     callerUsername,
                     type,
@@ -531,7 +678,7 @@ export function GroupCallProvider({
 
     /*
      * ============================================================
-     * CALL ENDED
+     * GROUP CALL ENDED
      * ============================================================
      */
 
@@ -605,7 +752,7 @@ export function GroupCallProvider({
 
     /*
      * ============================================================
-     * SOCKET EVENTS
+     * GROUP SOCKET EVENTS
      * ============================================================
      */
 

@@ -24,10 +24,14 @@ export function IncomingGroupCall() {
     const isVideo =
         incomingCall.type === "video";
 
-    const handleAccept = () => {
-        joinCall(
-            incomingCall.conversationId,
-            incomingCall.type
+    const handleAccept = async () => {
+        const call = incomingCall;
+
+        declineCall();
+
+        await joinCall(
+            call.conversationId,
+            call.type
         );
     };
 

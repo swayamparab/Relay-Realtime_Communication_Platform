@@ -191,67 +191,51 @@ export function useCallActions() {
      *
      * The server handles the actual validation.
      */
-    function addParticipantToCall(
+    async function addParticipantToCall(
         userId: string
-    ) {
-        if (!socket) {
-            return;
-        }
-
+    ): Promise<boolean> {
         if (!callState.conversationId) {
-            toast.error(
-                "No active call."
-            );
-
-            return;
+            return false;
         }
 
         if (
             callState.type !== "voice" &&
             callState.type !== "video"
         ) {
-            toast.error(
-                "Invalid call type."
-            );
-
-            return;
+            return false;
         }
 
-        const conversationId =
-            callState.conversationId;
+        return new Promise((resolve) => {
+            socket.emit(
+                "group_call:promote",
+                {
+                    conversationId:
+                        callState.conversationId,
+                    type: callState.type,
+                    userId,
+                },
+                (response: {
+                    success: boolean;
+                    message?: string;
+                }) => {
+                    if (!response.success) {
+                        toast.error(
+                            response.message ??
+                            "Failed to add participant."
+                        );
 
-        /*
-         * At this point this action is being
-         * called from the existing 1-to-1
-         * call screen.
-         *
-         * Promote the call to a group call.
-         */
-        socket.emit(
-            "group_call:promote",
-            {
-                conversationId,
-                type: callState.type,
-                userId,
-            },
-            (response: {
-                success: boolean;
-                message?: string;
-            }) => {
-                if (!response.success) {
-                    toast.error(
-                        response.message ??
-                        "Failed to add participant."
+                        resolve(false);
+                        return;
+                    }
+
+                    toast.success(
+                        "Participant invited."
                     );
 
-                    return;
+                    resolve(true);
                 }
-
-                toast.success(
-                    "Participant invited."
-                );
-            }
-        );
+            );
+        });
     }
 
     function addParticipantToGroupCall(

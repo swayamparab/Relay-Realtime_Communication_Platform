@@ -13,6 +13,11 @@ import { useCurrentUser } from "@/hooks/user/useCurrentUser";
 
 type CallType = "voice" | "video";
 
+type Participant = {
+    id: string;
+    username: string;
+};
+
 type GroupWebRTCContextType = {
     localStream: MediaStream | null;
 
@@ -37,6 +42,11 @@ type GroupWebRTCContextType = {
     getLocalStream: (
         type: CallType
     ) => Promise<MediaStream | null>;
+
+    adoptLocalStream: (
+        stream: MediaStream,
+        conversationId: string
+    ) => void;
 
     createPeerConnection: (
         remoteUserId: string
@@ -103,21 +113,24 @@ export function GroupWebRTCProvider({
             new Map()
         );
 
-    const [remoteVideoStates, setRemoteVideoStates] =
-        useState<RemoteVideoState>(new Map());
+    const [
+        remoteVideoStates,
+        setRemoteVideoStates,
+    ] = useState<RemoteVideoState>(
+        new Map()
+    );
 
-    const [remoteMuteStates, setRemoteMuteStates] =
-        useState<Map<string, boolean>>(
-            new Map()
-        );
+    const [
+        remoteMuteStates,
+        setRemoteMuteStates,
+    ] = useState<Map<string, boolean>>(
+        new Map()
+    );
 
     /*
      * ============================================================
      * REFS
      * ============================================================
-     *
-     * Refs are used for WebRTC objects because changing them
-     * should not cause React re-renders.
      */
 
     const localStreamRef =
@@ -126,20 +139,23 @@ export function GroupWebRTCProvider({
     const conversationIdRef =
         useRef<string | null>(null);
 
-    const peerConnections = useRef(
-        new Map<string, RTCPeerConnection>()
-    );
+    const peerConnections =
+        useRef<
+            Map<string, RTCPeerConnection>
+        >(new Map());
 
-    const pendingIceCandidates = useRef(
-        new Map<
-            string,
-            RTCIceCandidateInit[]
-        >()
-    );
+    const pendingIceCandidates =
+        useRef<
+            Map<
+                string,
+                RTCIceCandidateInit[]
+            >
+        >(new Map());
 
-    const makingOffer = useRef(
-        new Map<string, boolean>()
-    );
+    const makingOffer =
+        useRef<Map<string, boolean>>(
+            new Map()
+        );
 
     /*
      * ============================================================
@@ -147,62 +163,99 @@ export function GroupWebRTCProvider({
      * ============================================================
      */
 
-    const setConversationId = useCallback(
-        (conversationId: string | null) => {
-            conversationIdRef.current =
-                conversationId;
-        },
-        []
-    );
+    const setConversationId =
+        useCallback(
+            (
+                conversationId: string | null
+            ) => {
+                conversationIdRef.current =
+                    conversationId;
+            },
+            []
+        );
 
     /*
      * ============================================================
-     * GET LOCAL MEDIA
+     * GET LOCAL STREAM
+     *
+     * Used for a brand-new group call.
+     *
+     * If a 1-to-1 call already has a local stream,
+     * that same stream is reused.
      * ============================================================
      */
 
-    const getLocalStream = useCallback(
-        async (
-            type: CallType
-        ): Promise<MediaStream | null> => {
-            /*
-             * Reuse existing stream.
-             */
-            if (localStreamRef.current) {
-                return localStreamRef.current;
-            }
+    const getLocalStream =
+        useCallback(
+            async (
+                type: CallType
+            ): Promise<MediaStream | null> => {
+                if (
+                    localStreamRef.current
+                ) {
+                    return localStreamRef.current;
+                }
 
-            try {
-                const stream =
-                    await navigator.mediaDevices.getUserMedia(
-                        {
-                            audio: true,
-                            video:
-                                type === "video",
-                        }
+                try {
+                    const stream =
+                        await navigator.mediaDevices.getUserMedia(
+                            {
+                                audio: true,
+                                video:
+                                    type ===
+                                    "video",
+                            }
+                        );
+
+                    localStreamRef.current =
+                        stream;
+
+                    setLocalStream(stream);
+
+                    return stream;
+                } catch (error) {
+                    console.error(
+                        "Failed to access local media:",
+                        error
                     );
 
+                    return null;
+                }
+            },
+            []
+        );
+
+    /*
+     * ============================================================
+     * ADOPT EXISTING 1-TO-1 STREAM
+     *
+     * This is the important 1-to-1 → group transition.
+     *
+     * The old WebRTC provider keeps the microphone/camera stream
+     * alive, and this provider takes ownership of that stream.
+     * ============================================================
+     */
+
+    const adoptLocalStream =
+        useCallback(
+            (
+                stream: MediaStream,
+                conversationId: string
+            ) => {
                 localStreamRef.current =
                     stream;
 
                 setLocalStream(stream);
 
-                return stream;
-            } catch (error) {
-                console.error(
-                    "Failed to access local media:",
-                    error
-                );
-
-                return null;
-            }
-        },
-        []
-    );
+                conversationIdRef.current =
+                    conversationId;
+            },
+            []
+        );
 
     /*
      * ============================================================
-     * CREATE PEER CONNECTION
+     * CREATE PARTICIPANT PEER CONNECTION
      * ============================================================
      */
 
@@ -224,89 +277,82 @@ export function GroupWebRTCProvider({
                     new RTCPeerConnection({
                         iceServers: [
                             {
-                                urls: "stun:stun.l.google.com:19302",
+                                urls:
+                                    "stun:stun.l.google.com:19302",
                             },
                         ],
                     });
 
                 /*
-                 * Add local media tracks.
+                 * Add local microphone/camera tracks.
                  */
+
                 const stream =
                     localStreamRef.current;
 
                 if (stream) {
-                    const existingTracks =
-                        new Set<string>();
-
-                    peer.getSenders().forEach(
-                        (sender) => {
-                            if (
-                                sender.track
-                            ) {
-                                existingTracks.add(
-                                    sender.track.id
-                                );
-                            }
-                        }
-                    );
-
                     stream
                         .getTracks()
                         .forEach(
                             (track) => {
-                                if (
-                                    existingTracks.has(
-                                        track.id
-                                    )
-                                ) {
-                                    return;
-                                }
+                                const alreadyAdded =
+                                    peer
+                                        .getSenders()
+                                        .some(
+                                            (
+                                                sender
+                                            ) =>
+                                                sender.track?.id ===
+                                                track.id
+                                        );
 
-                                peer.addTrack(
-                                    track,
-                                    stream
-                                );
+                                if (
+                                    !alreadyAdded
+                                ) {
+                                    peer.addTrack(
+                                        track,
+                                        stream
+                                    );
+                                }
                             }
                         );
                 }
 
                 /*
                  * ========================================================
-                 * ICE CANDIDATES
+                 * ICE
                  * ========================================================
                  */
 
-                peer.onicecandidate = (
-                    event
-                ) => {
-                    if (
-                        !event.candidate
-                    ) {
-                        return;
-                    }
-
-                    const conversationId =
-                        conversationIdRef.current;
-
-                    if (
-                        !conversationId ||
-                        !socket
-                    ) {
-                        return;
-                    }
-
-                    socket.emit(
-                        "group_call:ice_candidate",
-                        {
-                            conversationId,
-                            targetUserId:
-                                remoteUserId,
-                            candidate:
-                                event.candidate,
+                peer.onicecandidate =
+                    (event) => {
+                        if (
+                            !event.candidate
+                        ) {
+                            return;
                         }
-                    );
-                };
+
+                        const conversationId =
+                            conversationIdRef.current;
+
+                        if (
+                            !conversationId ||
+                            !socket
+                        ) {
+                            return;
+                        }
+
+                        socket.emit(
+                            "group_call:ice_candidate",
+                            {
+                                conversationId,
+                                targetUserId:
+                                    remoteUserId,
+                                candidate:
+                                    event.candidate,
+                            }
+                        );
+                    };
 
                 /*
                  * ========================================================
@@ -314,7 +360,9 @@ export function GroupWebRTCProvider({
                  * ========================================================
                  */
 
-                peer.ontrack = (event) => {
+                peer.ontrack = (
+                    event
+                ) => {
                     const stream =
                         event.streams[0];
 
@@ -353,6 +401,7 @@ export function GroupWebRTCProvider({
                         console.log(
                             "[Group WebRTC]",
                             remoteUserId,
+                            "connection:",
                             state
                         );
 
@@ -424,8 +473,11 @@ export function GroupWebRTCProvider({
                     };
 
                 /*
-                 * ICE connection state.
+                 * ========================================================
+                 * ICE CONNECTION STATE
+                 * ========================================================
                  */
+
                 peer.oniceconnectionstatechange =
                     () => {
                         console.log(
@@ -447,18 +499,13 @@ export function GroupWebRTCProvider({
 
     /*
      * ============================================================
-     * SHOULD I CREATE THE OFFER?
+     * DETERMINE OFFERER
+     *
+     * Smaller user ID creates the offer.
+     *
+     * This prevents both participants from creating an offer
+     * at exactly the same time.
      * ============================================================
-     *
-     * Deterministic negotiation:
-     *
-     * user A + user B
-     *
-     * The lexicographically smaller user ID
-     * creates the offer.
-     *
-     * This prevents both sides from creating
-     * an offer simultaneously.
      */
 
     const shouldCreateOffer =
@@ -485,128 +532,133 @@ export function GroupWebRTCProvider({
      * ============================================================
      */
 
-    const createOffer = useCallback(
-        async (
-            targetUserId: string
-        ) => {
-            if (!socket) {
-                return;
-            }
+    const createOffer =
+        useCallback(
+            async (
+                targetUserId: string
+            ) => {
+                if (!socket) {
+                    return;
+                }
 
-            const localUserId =
-                currentUser?.user.id;
+                const localUserId =
+                    currentUser?.user.id;
 
-            if (!localUserId) {
-                console.warn(
-                    "Cannot create group WebRTC offer: current user unavailable."
-                );
+                if (!localUserId) {
+                    console.warn(
+                        "Cannot create group offer: current user unavailable."
+                    );
 
-                return;
-            }
+                    return;
+                }
 
-            /*
-             * Never connect to ourselves.
-             */
-            if (
-                localUserId ===
-                targetUserId
-            ) {
-                return;
-            }
+                /*
+                 * Never connect to ourselves.
+                 */
 
-            /*
-             * Deterministic offerer.
-             */
-            if (
-                !shouldCreateOffer(
+                if (
+                    localUserId ===
                     targetUserId
-                )
-            ) {
-                return;
-            }
+                ) {
+                    return;
+                }
 
-            let peer =
-                peerConnections.current.get(
-                    targetUserId
-                );
+                /*
+                 * Only the deterministic offerer
+                 * creates the offer.
+                 */
 
-            if (!peer) {
-                peer =
-                    createPeerConnection(
+                if (
+                    !shouldCreateOffer(
+                        targetUserId
+                    )
+                ) {
+                    return;
+                }
+
+                let peer =
+                    peerConnections.current.get(
                         targetUserId
                     );
-            }
 
-            /*
-             * Don't create duplicate offers.
-             */
-            if (
-                makingOffer.current.get(
-                    targetUserId
-                )
-            ) {
-                return;
-            }
+                if (!peer) {
+                    peer =
+                        createPeerConnection(
+                            targetUserId
+                        );
+                }
 
-            if (
-                peer.signalingState !==
-                "stable"
-            ) {
-                return;
-            }
+                /*
+                 * Prevent duplicate offers.
+                 */
 
-            const conversationId =
-                conversationIdRef.current;
+                if (
+                    makingOffer.current.get(
+                        targetUserId
+                    )
+                ) {
+                    return;
+                }
 
-            if (!conversationId) {
-                console.warn(
-                    "Cannot create offer without conversation ID."
-                );
+                if (
+                    peer.signalingState !==
+                    "stable"
+                ) {
+                    return;
+                }
 
-                return;
-            }
+                const conversationId =
+                    conversationIdRef.current;
 
-            try {
-                makingOffer.current.set(
-                    targetUserId,
-                    true
-                );
+                if (!conversationId) {
+                    console.warn(
+                        "Cannot create group offer without conversation ID."
+                    );
 
-                const offer =
-                    await peer.createOffer();
+                    return;
+                }
 
-                await peer.setLocalDescription(
-                    offer
-                );
-
-                socket.emit(
-                    "group_call:offer",
-                    {
-                        conversationId,
+                try {
+                    makingOffer.current.set(
                         targetUserId,
-                        offer:
-                            peer.localDescription,
-                    }
-                );
-            } catch (error) {
-                console.error(
-                    "Failed to create group WebRTC offer:",
-                    error
-                );
-            } finally {
-                makingOffer.current.set(
-                    targetUserId,
-                    false
-                );
-            }
-        },
-        [
-            socket,
-            currentUser?.user.id,
-            shouldCreateOffer,
-            createPeerConnection,
-        ]
-    );
+                        true
+                    );
+
+                    const offer =
+                        await peer.createOffer();
+
+                    await peer.setLocalDescription(
+                        offer
+                    );
+
+                    socket.emit(
+                        "group_call:offer",
+                        {
+                            conversationId,
+                            targetUserId,
+                            offer:
+                                peer.localDescription,
+                        }
+                    );
+                } catch (error) {
+                    console.error(
+                        "Failed to create group WebRTC offer:",
+                        error
+                    );
+                } finally {
+                    makingOffer.current.set(
+                        targetUserId,
+                        false
+                    );
+                }
+            },
+            [
+                socket,
+                currentUser?.user.id,
+                shouldCreateOffer,
+                createPeerConnection,
+            ]
+        );
 
     /*
      * ============================================================
@@ -614,111 +666,118 @@ export function GroupWebRTCProvider({
      * ============================================================
      */
 
-    const handleOffer = useCallback(
-        async (
-            senderId: string,
-            offer: RTCSessionDescriptionInit
-        ) => {
-            let peer =
-                peerConnections.current.get(
-                    senderId
-                );
-
-            if (!peer) {
-                peer =
-                    createPeerConnection(
+    const handleOffer =
+        useCallback(
+            async (
+                senderId: string,
+                offer: RTCSessionDescriptionInit
+            ) => {
+                let peer =
+                    peerConnections.current.get(
                         senderId
                     );
-            }
 
-            /*
-             * We are not the designated offerer.
-             *
-             * Therefore we simply accept the offer.
-             */
-            if (
-                peer.signalingState !==
-                "stable"
-            ) {
-                console.warn(
-                    "Ignoring group offer because signaling state is:",
-                    peer.signalingState
-                );
-
-                return;
-            }
-
-            try {
-                await peer.setRemoteDescription(
-                    new RTCSessionDescription(
-                        offer
-                    )
-                );
-
-                /*
-                 * Add ICE candidates that arrived
-                 * before the remote description.
-                 */
-                const pending =
-                    pendingIceCandidates.current.get(
-                        senderId
-                    ) ?? [];
-
-                for (const candidate of pending) {
-                    try {
-                        await peer.addIceCandidate(
-                            new RTCIceCandidate(
-                                candidate
-                            )
+                if (!peer) {
+                    peer =
+                        createPeerConnection(
+                            senderId
                         );
-                    } catch (error) {
-                        console.error(
-                            "Failed to add pending group ICE candidate:",
-                            error
-                        );
-                    }
                 }
 
-                pendingIceCandidates.current.delete(
-                    senderId
-                );
+                /*
+                 * Only accept an offer when the peer
+                 * is stable.
+                 */
 
-                const answer =
-                    await peer.createAnswer();
+                if (
+                    peer.signalingState !==
+                    "stable"
+                ) {
+                    console.warn(
+                        "Ignoring group offer. Signaling state:",
+                        peer.signalingState
+                    );
 
-                await peer.setLocalDescription(
-                    answer
-                );
-
-                const conversationId =
-                    conversationIdRef.current;
-
-                if (!conversationId) {
                     return;
                 }
 
-                socket.emit(
-                    "group_call:answer",
-                    {
-                        conversationId,
-                        targetUserId:
-                            senderId,
-                        answer:
-                            peer.localDescription,
+                try {
+                    await peer.setRemoteDescription(
+                        new RTCSessionDescription(
+                            offer
+                        )
+                    );
+
+                    /*
+                     * Flush ICE candidates that arrived
+                     * before the remote description.
+                     */
+
+                    const pending =
+                        pendingIceCandidates.current.get(
+                            senderId
+                        ) ?? [];
+
+                    for (
+                        const candidate of
+                        pending
+                    ) {
+                        try {
+                            await peer.addIceCandidate(
+                                new RTCIceCandidate(
+                                    candidate
+                                )
+                            );
+                        } catch (error) {
+                            console.error(
+                                "Failed to add pending group ICE:",
+                                error
+                            );
+                        }
                     }
-                );
-            } catch (error) {
-                console.error(
-                    "Failed to handle group WebRTC offer:",
-                    error
-                );
-            }
-        },
-        [
-            socket,
-            createPeerConnection,
-        ]
-    );
+
+                    pendingIceCandidates.current.delete(
+                        senderId
+                    );
+
+                    const answer =
+                        await peer.createAnswer();
+
+                    await peer.setLocalDescription(
+                        answer
+                    );
+
+                    const conversationId =
+                        conversationIdRef.current;
+
+                    if (
+                        !conversationId
+                    ) {
+                        return;
+                    }
+
+                    socket.emit(
+                        "group_call:answer",
+                        {
+                            conversationId,
+                            targetUserId:
+                                senderId,
+                            answer:
+                                peer.localDescription,
+                        }
+                    );
+                } catch (error) {
+                    console.error(
+                        "Failed to handle group WebRTC offer:",
+                        error
+                    );
+                }
+            },
+            [
+                socket,
+                createPeerConnection,
+            ]
+        );
 
     /*
      * ============================================================
@@ -726,194 +785,196 @@ export function GroupWebRTCProvider({
      * ============================================================
      */
 
-    const handleAnswer = useCallback(
-        async (
-            senderId: string,
-            answer: RTCSessionDescriptionInit
-        ) => {
-            const peer =
-                peerConnections.current.get(
-                    senderId
-                );
-
-            if (!peer) {
-                console.warn(
-                    "Received answer for unknown peer:",
-                    senderId
-                );
-
-                return;
-            }
-
-            if (
-                peer.signalingState !==
-                "have-local-offer"
-            ) {
-                console.warn(
-                    "Ignoring group answer because signaling state is:",
-                    peer.signalingState
-                );
-
-                return;
-            }
-
-            try {
-                await peer.setRemoteDescription(
-                    new RTCSessionDescription(
-                        answer
-                    )
-                );
-
-                /*
-                 * ICE candidates may have arrived
-                 * while the answer was being negotiated.
-                 */
-                const pending =
-                    pendingIceCandidates.current.get(
+    const handleAnswer =
+        useCallback(
+            async (
+                senderId: string,
+                answer: RTCSessionDescriptionInit
+            ) => {
+                const peer =
+                    peerConnections.current.get(
                         senderId
-                    ) ?? [];
+                    );
 
-                for (const candidate of pending) {
-                    try {
-                        await peer.addIceCandidate(
-                            new RTCIceCandidate(
-                                candidate
-                            )
-                        );
-                    } catch (error) {
-                        console.error(
-                            "Failed to add pending ICE after answer:",
-                            error
-                        );
-                    }
+                if (!peer) {
+                    console.warn(
+                        "Received group answer for unknown peer:",
+                        senderId
+                    );
+
+                    return;
                 }
 
-                pendingIceCandidates.current.delete(
-                    senderId
-                );
-            } catch (error) {
-                console.error(
-                    "Failed to handle group WebRTC answer:",
-                    error
-                );
-            }
-        },
-        []
-    );
+                if (
+                    peer.signalingState !==
+                    "have-local-offer"
+                ) {
+                    console.warn(
+                        "Ignoring group answer. Signaling state:",
+                        peer.signalingState
+                    );
+
+                    return;
+                }
+
+                try {
+                    await peer.setRemoteDescription(
+                        new RTCSessionDescription(
+                            answer
+                        )
+                    );
+
+                    /*
+                     * Flush queued ICE.
+                     */
+
+                    const pending =
+                        pendingIceCandidates.current.get(
+                            senderId
+                        ) ?? [];
+
+                    for (
+                        const candidate of
+                        pending
+                    ) {
+                        try {
+                            await peer.addIceCandidate(
+                                new RTCIceCandidate(
+                                    candidate
+                                )
+                            );
+                        } catch (error) {
+                            console.error(
+                                "Failed to add pending ICE after answer:",
+                                error
+                            );
+                        }
+                    }
+
+                    pendingIceCandidates.current.delete(
+                        senderId
+                    );
+                } catch (error) {
+                    console.error(
+                        "Failed to handle group WebRTC answer:",
+                        error
+                    );
+                }
+            },
+            []
+        );
 
     /*
      * ============================================================
-     * HANDLE ICE CANDIDATE
+     * HANDLE ICE
      * ============================================================
      */
 
-    const handleIceCandidate = useCallback(
-        async (
-            senderId: string,
-            candidate: RTCIceCandidateInit
-        ) => {
-            const peer =
-                peerConnections.current.get(
-                    senderId
-                );
-
-            /*
-             * Peer doesn't exist yet.
-             *
-             * Queue candidate.
-             */
-            if (!peer) {
-                const pending =
-                    pendingIceCandidates.current.get(
+    const handleIceCandidate =
+        useCallback(
+            async (
+                senderId: string,
+                candidate: RTCIceCandidateInit
+            ) => {
+                const peer =
+                    peerConnections.current.get(
                         senderId
-                    ) ?? [];
+                    );
 
-                pending.push(candidate);
+                /*
+                 * Peer doesn't exist yet.
+                 */
 
-                pendingIceCandidates.current.set(
-                    senderId,
-                    pending
-                );
+                if (!peer) {
+                    const pending =
+                        pendingIceCandidates.current.get(
+                            senderId
+                        ) ?? [];
 
-                return;
-            }
+                    pending.push(candidate);
 
-            /*
-             * Remote description hasn't been
-             * applied yet.
-             */
-            if (
-                !peer.remoteDescription
-            ) {
-                const pending =
-                    pendingIceCandidates.current.get(
-                        senderId
-                    ) ?? [];
+                    pendingIceCandidates.current.set(
+                        senderId,
+                        pending
+                    );
 
-                pending.push(candidate);
+                    return;
+                }
 
-                pendingIceCandidates.current.set(
-                    senderId,
-                    pending
-                );
+                /*
+                 * Peer exists but remote description
+                 * isn't ready yet.
+                 */
 
-                return;
-            }
+                if (
+                    !peer.remoteDescription
+                ) {
+                    const pending =
+                        pendingIceCandidates.current.get(
+                            senderId
+                        ) ?? [];
 
-            try {
-                await peer.addIceCandidate(
-                    new RTCIceCandidate(
-                        candidate
-                    )
-                );
-            } catch (error) {
-                console.error(
-                    "Failed to add group ICE candidate:",
-                    error
-                );
-            }
-        },
-        []
-    );
+                    pending.push(candidate);
+
+                    pendingIceCandidates.current.set(
+                        senderId,
+                        pending
+                    );
+
+                    return;
+                }
+
+                try {
+                    await peer.addIceCandidate(
+                        new RTCIceCandidate(
+                            candidate
+                        )
+                    );
+                } catch (error) {
+                    console.error(
+                        "Failed to add group ICE candidate:",
+                        error
+                    );
+                }
+            },
+            []
+        );
 
     /*
      * ============================================================
-     * HAS PEER
+     * CHECK PEER
      * ============================================================
      */
 
-    const hasPeerConnection = useCallback(
-        (remoteUserId: string) => {
-            const peer =
-                peerConnections.current.get(
-                    remoteUserId
-                );
+    const hasPeerConnection =
+        useCallback(
+            (remoteUserId: string) => {
+                const peer =
+                    peerConnections.current.get(
+                        remoteUserId
+                    );
 
-            if (!peer) {
-                return false;
-            }
+                if (!peer) {
+                    return false;
+                }
 
-            /*
-             * A closed connection should not
-             * count as an active peer.
-             */
-            if (
-                peer.connectionState ===
-                "closed" ||
-                peer.connectionState ===
-                "failed"
-            ) {
-                return false;
-            }
+                if (
+                    peer.connectionState ===
+                    "closed" ||
+                    peer.connectionState ===
+                    "failed"
+                ) {
+                    return false;
+                }
 
-            return true;
-        },
-        []
-    );
+                return true;
+            },
+            []
+        );
 
     /*
      * ============================================================
-     * CLOSE ONE PEER
+     * CLOSE ONE PARTICIPANT
      * ============================================================
      */
 
@@ -926,6 +987,12 @@ export function GroupWebRTCProvider({
                     );
 
                 if (peer) {
+                    peer.ontrack = null;
+                    peer.onicecandidate =
+                        null;
+                    peer.onconnectionstatechange =
+                        null;
+
                     peer.close();
                 }
 
@@ -989,24 +1056,27 @@ export function GroupWebRTCProvider({
      * ============================================================
      */
 
-    const cleanupWebRTC = useCallback(
-        () => {
+    const cleanupWebRTC =
+        useCallback(() => {
             /*
              * Stop local microphone/camera.
              */
+
             localStreamRef.current
                 ?.getTracks()
                 .forEach((track) => {
                     track.stop();
                 });
 
-            localStreamRef.current = null;
+            localStreamRef.current =
+                null;
 
             setLocalStream(null);
 
             /*
-             * Close every peer.
+             * Close all participant peers.
              */
+
             peerConnections.current.forEach(
                 (peer) => {
                     peer.ontrack = null;
@@ -1014,6 +1084,7 @@ export function GroupWebRTCProvider({
                         null;
                     peer.onconnectionstatechange =
                         null;
+
                     peer.close();
                 }
             );
@@ -1021,15 +1092,17 @@ export function GroupWebRTCProvider({
             peerConnections.current.clear();
 
             /*
-             * Clear pending WebRTC state.
+             * Clear negotiation state.
              */
+
             pendingIceCandidates.current.clear();
 
             makingOffer.current.clear();
 
             /*
-             * Clear remote streams.
+             * Stop remote streams.
              */
+
             setRemoteStreams((prev) => {
                 prev.forEach(
                     (stream) => {
@@ -1046,6 +1119,10 @@ export function GroupWebRTCProvider({
                 return new Map();
             });
 
+            /*
+             * Clear remote states.
+             */
+
             setRemoteVideoStates(
                 new Map()
             );
@@ -1054,11 +1131,13 @@ export function GroupWebRTCProvider({
                 new Map()
             );
 
+            /*
+             * Clear conversation.
+             */
+
             conversationIdRef.current =
                 null;
-        },
-        []
-    );
+        }, []);
 
     /*
      * ============================================================
@@ -1069,6 +1148,7 @@ export function GroupWebRTCProvider({
     const value = useMemo(
         () => ({
             localStream,
+
             remoteStreams,
 
             remoteVideoStates,
@@ -1077,18 +1157,24 @@ export function GroupWebRTCProvider({
             remoteMuteStates,
             setRemoteMuteStates,
 
-            getLocalStream,
-
             setConversationId,
 
+            getLocalStream,
+
+            adoptLocalStream,
+
             createPeerConnection,
+
             createOffer,
 
             handleOffer,
+
             handleAnswer,
+
             handleIceCandidate,
 
             hasPeerConnection,
+
             closePeerConnection,
 
             cleanupWebRTC,
@@ -1100,17 +1186,24 @@ export function GroupWebRTCProvider({
             remoteVideoStates,
             remoteMuteStates,
 
-            getLocalStream,
             setConversationId,
 
+            getLocalStream,
+
+            adoptLocalStream,
+
             createPeerConnection,
+
             createOffer,
 
             handleOffer,
+
             handleAnswer,
+
             handleIceCandidate,
 
             hasPeerConnection,
+
             closePeerConnection,
 
             cleanupWebRTC,

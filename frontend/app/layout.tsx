@@ -42,9 +42,9 @@ export default function RootLayout({
         <QueryProvider>
           <SocketProvider>
             <WebRTCProvider>
-              <CallProvider>
-                <GroupWebRTCProvider>
-                  <GroupCallProvider>
+              <GroupWebRTCProvider>
+                <GroupCallProvider>
+                  <CallProvider>
                     <CallEvents />
                     <WebRTCEvents />
                     {children}
@@ -52,9 +52,9 @@ export default function RootLayout({
                       position="top-right"
                       richColors
                     />
-                  </GroupCallProvider>
-                </GroupWebRTCProvider>
-              </CallProvider>
+                  </CallProvider>
+                </GroupCallProvider>
+              </GroupWebRTCProvider>
             </WebRTCProvider>
           </SocketProvider>
         </QueryProvider>
