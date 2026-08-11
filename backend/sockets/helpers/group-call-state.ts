@@ -1,4 +1,4 @@
-const MAX_GROUP_CALL_PARTICIPANTS = 5;
+const MAX_GROUP_CALL_PARTICIPANTS = 6;
 
 const groupCallParticipants = new Map<
     string,

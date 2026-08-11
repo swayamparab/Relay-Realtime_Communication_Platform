@@ -38,7 +38,7 @@ export default function Sidebar() {
                             onValueChange={setQuery}
                         />
 
-                        <OngoingCallCard />
+                        {/* <OngoingCallCard /> */}
 
                         {query.trim() ? (
                             <SearchResults query={query} />

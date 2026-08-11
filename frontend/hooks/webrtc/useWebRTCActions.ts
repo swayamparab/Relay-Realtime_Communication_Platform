@@ -14,6 +14,11 @@ export function useWebRTCActions() {
         createPeerConnection,
         setupLocalMedia,
         pendingIceCandidates,
+
+        peerConnections,
+        createParticipantPeerConnection,
+        pendingPeerIceCandidates,
+
         setIsMuted,
         setIsCameraOff,
         cameraFacingMode,
@@ -95,6 +100,71 @@ export function useWebRTCActions() {
         });
     }
 
+    async function createParticipantOffer(
+        conversationId: string,
+        targetUserId: string
+    ) {
+        if (!socket || !localStream) {
+            return;
+        }
+
+        const peer =
+            createParticipantPeerConnection(
+                targetUserId
+            );
+
+        const senders = peer.getSenders();
+
+        localStream.getTracks().forEach(
+            (track) => {
+                const alreadyAdded =
+                    senders.some(
+                        (sender) =>
+                            sender.track === track
+                    );
+
+                if (!alreadyAdded) {
+                    peer.addTrack(
+                        track,
+                        localStream
+                    );
+                }
+            }
+        );
+
+        peer.onicecandidate = (event) => {
+            if (!event.candidate) {
+                return;
+            }
+
+            socket.emit(
+                "group_call:ice_candidate",
+                {
+                    targetUserId,
+                    conversationId,
+                    candidate:
+                        event.candidate,
+                }
+            );
+        };
+
+        const offer =
+            await peer.createOffer();
+
+        await peer.setLocalDescription(
+            offer
+        );
+
+        socket.emit(
+            "group_call:offer",
+            {
+                targetUserId,
+                conversationId,
+                offer,
+            }
+        );
+    }
+
     function toggleMute() {
         const audioTrack = localStream?.getAudioTracks()[0];
 
@@ -173,6 +243,7 @@ export function useWebRTCActions() {
     return {
         createOffer,
         createAnswer,
+        createParticipantOffer,
         toggleMute,
         toggleCamera,
         switchCamera

@@ -1,6 +1,7 @@
 import { Server, Socket } from "socket.io";
 
 import {
+    getConversationParticipantIds,
     isParticipant,
 } from "../../modules/conversation/conversation.service";
 
@@ -12,6 +13,13 @@ import {
 } from "../helpers/group-call-state";
 
 import {
+    addGroupCallInvite,
+    hasGroupCallInvite,
+    removeGroupCallInvite,
+    clearGroupCallInvites,
+} from "../helpers/group-call-invites";
+
+import {
     createGroupCall,
     endGroupCall,
     getActiveGroupCall,
@@ -20,6 +28,14 @@ import {
 import { db } from "../../db";
 import { eq } from "drizzle-orm";
 import { users } from "../../db/schema";
+
+import { activeCalls } from "../helpers/active-calls";
+import { getSocketId } from "../helpers/online-users";
+
+type CallType = "voice" | "video";
+
+const GROUP_CALL_ROOM = (conversationId: string) =>
+    `group-call:${conversationId}`;
 
 async function getUsername(userId: string) {
     const user = await db.query.users.findFirst({
@@ -36,18 +52,13 @@ async function getParticipantsWithUsernames(
     conversationId: string
 ) {
     const participantIds =
-        getGroupCallParticipants(
-            conversationId
-        );
+        getGroupCallParticipants(conversationId);
 
     return Promise.all(
-        participantIds.map(
-            async (userId) => ({
-                id: userId,
-                username:
-                    await getUsername(userId),
-            })
-        )
+        participantIds.map(async (userId) => ({
+            id: userId,
+            username: await getUsername(userId),
+        }))
     );
 }
 
@@ -55,6 +66,449 @@ export function registerGroupCallEvents(
     io: Server,
     socket: Socket
 ) {
+    /*
+     * ============================================================
+     * PROMOTE ONE-TO-ONE CALL → GROUP CALL
+     * ============================================================
+     */
+    socket.on(
+        "group_call:promote",
+        async (
+            {
+                conversationId,
+                type,
+                userId,
+            }: {
+                conversationId: string;
+                type: CallType;
+                userId: string;
+            },
+            callback
+        ) => {
+            try {
+                /*
+                 * Promoter must belong to conversation.
+                 */
+                const allowed = await isParticipant(
+                    socket.userId,
+                    conversationId
+                );
+
+                if (!allowed) {
+                    return callback?.({
+                        success: false,
+                        message: "Unauthorized.",
+                    });
+                }
+
+                /*
+                 * Cannot invite yourself.
+                 */
+                if (userId === socket.userId) {
+                    return callback?.({
+                        success: false,
+                        message:
+                            "You cannot add yourself to the call.",
+                    });
+                }
+
+                /*
+                 * Target must belong to conversation.
+                 */
+                const targetAllowed =
+                    await isParticipant(
+                        userId,
+                        conversationId
+                    );
+
+                if (!targetAllowed) {
+                    return callback?.({
+                        success: false,
+                        message:
+                            "User is not a conversation participant.",
+                    });
+                }
+
+                /*
+                 * Target cannot already be in another
+                 * one-to-one call.
+                 */
+                if (activeCalls.has(userId)) {
+                    return callback?.({
+                        success: false,
+                        message:
+                            "User is already on another call.",
+                    });
+                }
+
+                /*
+                 * There must not already be a group call.
+                 */
+                const existingGroupCall =
+                    await getActiveGroupCall(
+                        conversationId
+                    );
+
+                if (existingGroupCall) {
+                    return callback?.({
+                        success: false,
+                        message:
+                            "A group call is already active.",
+                    });
+                }
+
+                /*
+                 * Find the two users currently involved
+                 * in the one-to-one call.
+                 */
+                const conversationParticipantIds =
+                    await getConversationParticipantIds(
+                        conversationId
+                    );
+
+                const activeParticipants =
+                    conversationParticipantIds.filter(
+                        (id) =>
+                            activeCalls.has(id)
+                    );
+
+                if (
+                    activeParticipants.length !== 2
+                ) {
+                    return callback?.({
+                        success: false,
+                        message:
+                            "No active one-to-one call found.",
+                    });
+                }
+
+                /*
+                 * Promoter must be one of the active
+                 * one-to-one participants.
+                 */
+                if (
+                    !activeParticipants.includes(
+                        socket.userId
+                    )
+                ) {
+                    return callback?.({
+                        success: false,
+                        message:
+                            "You are not part of the active call.",
+                    });
+                }
+
+                /*
+                 * Create group call.
+                 */
+                const groupCall =
+                    await createGroupCall(
+                        conversationId,
+                        socket.userId,
+                        type
+                    );
+
+                /*
+                 * Move existing one-to-one participants
+                 * into group-call state.
+                 */
+                for (
+                    const participantId of
+                    activeParticipants
+                ) {
+                    activeCalls.delete(
+                        participantId
+                    );
+
+                    joinGroupCall(
+                        conversationId,
+                        participantId
+                    );
+
+                    const socketId =
+                        getSocketId(
+                            participantId
+                        );
+
+                    if (socketId) {
+                        const participantSocket =
+                            io.sockets.sockets.get(
+                                socketId
+                            );
+
+                        participantSocket?.join(
+                            GROUP_CALL_ROOM(
+                                conversationId
+                            )
+                        );
+                    }
+                }
+
+                /*
+                 * Create invitation for new participant.
+                 */
+                addGroupCallInvite(
+                    conversationId,
+                    userId
+                );
+
+                const participants =
+                    await getParticipantsWithUsernames(
+                        conversationId
+                    );
+
+                /*
+                 * Tell existing call participants
+                 * that the call has become a group call.
+                 */
+                io.to(
+                    GROUP_CALL_ROOM(
+                        conversationId
+                    )
+                ).emit(
+                    "group_call:promoted",
+                    {
+                        conversationId,
+                        type: groupCall.type,
+                        participants,
+                    }
+                );
+
+                /*
+                 * Invite selected user.
+                 */
+                const callerUsername =
+                    await getUsername(
+                        socket.userId
+                    );
+
+                io.to(userId).emit(
+                    "group_call:participant_invited",
+                    {
+                        conversationId,
+                        callerId:
+                            socket.userId,
+                        callerUsername,
+                        type: groupCall.type,
+                    }
+                );
+
+                callback?.({
+                    success: true,
+                    type: groupCall.type,
+                    participants,
+                });
+            } catch (error) {
+                console.error(
+                    "group_call:promote error:",
+                    error
+                );
+
+                callback?.({
+                    success: false,
+                    message:
+                        error instanceof Error
+                            ? error.message
+                            : "Internal Server Error.",
+                });
+            }
+        }
+    );
+
+    /*
+     * ============================================================
+     * ADD PARTICIPANT TO EXISTING GROUP CALL
+     * ============================================================
+     */
+    socket.on(
+        "group_call:add_participant",
+        async (
+            {
+                conversationId,
+                userId,
+            }: {
+                conversationId: string;
+                userId: string;
+            },
+            callback
+        ) => {
+            try {
+                /*
+                 * Group call must exist.
+                 */
+                const activeCall =
+                    await getActiveGroupCall(
+                        conversationId
+                    );
+
+                if (!activeCall) {
+                    return callback?.({
+                        success: false,
+                        message:
+                            "No active group call.",
+                    });
+                }
+
+                /*
+                 * Inviter must actually be inside
+                 * the group call.
+                 */
+                const currentParticipants =
+                    getGroupCallParticipants(
+                        conversationId
+                    );
+
+                if (
+                    !currentParticipants.includes(
+                        socket.userId
+                    )
+                ) {
+                    return callback?.({
+                        success: false,
+                        message:
+                            "You are not part of the active group call.",
+                    });
+                }
+
+                /*
+                 * Cannot invite yourself.
+                 */
+                if (userId === socket.userId) {
+                    return callback?.({
+                        success: false,
+                        message:
+                            "You cannot add yourself to the call.",
+                    });
+                }
+
+                /*
+                 * Target must be a conversation member.
+                 */
+                const invitedUserAllowed =
+                    await isParticipant(
+                        userId,
+                        conversationId
+                    );
+
+                if (!invitedUserAllowed) {
+                    return callback?.({
+                        success: false,
+                        message:
+                            "User is not a conversation participant.",
+                    });
+                }
+
+                /*
+                 * Target cannot already be in call.
+                 */
+                if (
+                    currentParticipants.includes(
+                        userId
+                    )
+                ) {
+                    return callback?.({
+                        success: false,
+                        message:
+                            "User is already in the call.",
+                    });
+                }
+
+                /*
+                 * Target cannot be in another
+                 * one-to-one call.
+                 */
+                if (activeCalls.has(userId)) {
+                    return callback?.({
+                        success: false,
+                        message:
+                            "User is already on another call.",
+                    });
+                }
+
+                /*
+                 * Check capacity.
+                 */
+                if (
+                    isGroupCallFull(
+                        conversationId
+                    )
+                ) {
+                    return callback?.({
+                        success: false,
+                        message:
+                            "Group call is full.",
+                    });
+                }
+
+                /*
+                 * Don't create duplicate invitation.
+                 */
+                if (
+                    hasGroupCallInvite(
+                        conversationId,
+                        userId
+                    )
+                ) {
+                    return callback?.({
+                        success: false,
+                        message:
+                            "User has already been invited.",
+                    });
+                }
+
+                /*
+                 * Store invitation.
+                 */
+                addGroupCallInvite(
+                    conversationId,
+                    userId
+                );
+
+                const callerUsername =
+                    await getUsername(
+                        socket.userId
+                    );
+
+                /*
+                 * Send invitation directly to
+                 * selected user.
+                 */
+                io.to(userId).emit(
+                    "group_call:participant_invited",
+                    {
+                        conversationId,
+                        callerId:
+                            socket.userId,
+                        callerUsername,
+                        type: activeCall.type,
+                    }
+                );
+
+                callback?.({
+                    success: true,
+                });
+            } catch (error) {
+                console.error(
+                    "group_call:add_participant error:",
+                    error
+                );
+
+                callback?.({
+                    success: false,
+                    message:
+                        error instanceof Error
+                            ? error.message
+                            : "Internal Server Error.",
+                });
+            }
+        }
+    );
+
+    /*
+     * ============================================================
+     * START GROUP CALL
+     * ============================================================
+     */
     socket.on(
         "group_call:start",
         async (
@@ -63,7 +517,7 @@ export function registerGroupCallEvents(
                 type,
             }: {
                 conversationId: string;
-                type: "voice" | "video";
+                type: CallType;
             },
             callback
         ) => {
@@ -77,7 +531,7 @@ export function registerGroupCallEvents(
                 if (!allowed) {
                     return callback?.({
                         success: false,
-                        message: "Unauthorized",
+                        message: "Unauthorized.",
                     });
                 }
 
@@ -119,19 +573,25 @@ export function registerGroupCallEvents(
                 );
 
                 socket.join(
-                    `group-call:${conversationId}`
+                    GROUP_CALL_ROOM(
+                        conversationId
+                    )
                 );
 
-                // Ring all other conversation members.
-                socket.to(conversationId).emit(
-                    "group_call:incoming",
-                    {
-                        conversationId,
-                        callerId:
-                            socket.userId,
-                        type,
-                    }
-                );
+                /*
+                 * Notify other conversation members.
+                 */
+                socket
+                    .to(conversationId)
+                    .emit(
+                        "group_call:incoming",
+                        {
+                            conversationId,
+                            callerId:
+                                socket.userId,
+                            type,
+                        }
+                    );
 
                 const participants =
                     await getParticipantsWithUsernames(
@@ -144,17 +604,27 @@ export function registerGroupCallEvents(
                     participants,
                 });
             } catch (error) {
+                console.error(
+                    "group_call:start error:",
+                    error
+                );
+
                 callback?.({
                     success: false,
                     message:
                         error instanceof Error
                             ? error.message
-                            : "Internal Server Error",
+                            : "Internal Server Error.",
                 });
             }
         }
     );
 
+    /*
+     * ============================================================
+     * JOIN GROUP CALL
+     * ============================================================
+     */
     socket.on(
         "group_call:join",
         async (
@@ -166,19 +636,6 @@ export function registerGroupCallEvents(
             callback
         ) => {
             try {
-                const allowed =
-                    await isParticipant(
-                        socket.userId,
-                        conversationId
-                    );
-
-                if (!allowed) {
-                    return callback?.({
-                        success: false,
-                        message: "Unauthorized",
-                    });
-                }
-
                 const activeCall =
                     await getActiveGroupCall(
                         conversationId
@@ -189,6 +646,27 @@ export function registerGroupCallEvents(
                         success: false,
                         message:
                             "No active group call.",
+                    });
+                }
+
+                /*
+                 * Check whether already in call
+                 * before checking capacity.
+                 */
+                const currentParticipants =
+                    getGroupCallParticipants(
+                        conversationId
+                    );
+
+                if (
+                    currentParticipants.includes(
+                        socket.userId
+                    )
+                ) {
+                    return callback?.({
+                        success: false,
+                        message:
+                            "You are already in the call.",
                     });
                 }
 
@@ -204,13 +682,50 @@ export function registerGroupCallEvents(
                     });
                 }
 
+                /*
+                 * Normal participant OR explicitly
+                 * invited user can join.
+                 */
+                const participant =
+                    await isParticipant(
+                        socket.userId,
+                        conversationId
+                    );
+
+                const invited =
+                    hasGroupCallInvite(
+                        conversationId,
+                        socket.userId
+                    );
+
+                if (!participant && !invited) {
+                    return callback?.({
+                        success: false,
+                        message:
+                            "You are not allowed to join this call.",
+                    });
+                }
+
+                /*
+                 * If joining through invitation,
+                 * consume it.
+                 */
+                if (invited) {
+                    removeGroupCallInvite(
+                        conversationId,
+                        socket.userId
+                    );
+                }
+
                 joinGroupCall(
                     conversationId,
                     socket.userId
                 );
 
                 socket.join(
-                    `group-call:${conversationId}`
+                    GROUP_CALL_ROOM(
+                        conversationId
+                    )
                 );
 
                 const username =
@@ -218,18 +733,23 @@ export function registerGroupCallEvents(
                         socket.userId
                     );
 
-                // Tell existing participants
-                // who joined.
-                socket.to(
-                    `group-call:${conversationId}`
-                ).emit(
-                    "group_call:user_joined",
-                    {
-                        userId:
-                            socket.userId,
-                        username,
-                    }
-                );
+                /*
+                 * Tell existing participants.
+                 */
+                socket
+                    .to(
+                        GROUP_CALL_ROOM(
+                            conversationId
+                        )
+                    )
+                    .emit(
+                        "group_call:user_joined",
+                        {
+                            userId:
+                                socket.userId,
+                            username,
+                        }
+                    );
 
                 const participants =
                     await getParticipantsWithUsernames(
@@ -242,17 +762,68 @@ export function registerGroupCallEvents(
                     type: activeCall.type,
                 });
             } catch (error) {
+                console.error(
+                    "group_call:join error:",
+                    error
+                );
+
                 callback?.({
                     success: false,
                     message:
                         error instanceof Error
                             ? error.message
-                            : "Internal Server Error",
+                            : "Internal Server Error.",
                 });
             }
         }
     );
 
+    /*
+     * ============================================================
+     * DECLINE GROUP CALL INVITATION
+     * ============================================================
+     */
+    socket.on(
+        "group_call:decline",
+        async (
+            {
+                conversationId,
+            }: {
+                conversationId: string;
+            },
+            callback
+        ) => {
+            try {
+                removeGroupCallInvite(
+                    conversationId,
+                    socket.userId
+                );
+
+                callback?.({
+                    success: true,
+                });
+            } catch (error) {
+                console.error(
+                    "group_call:decline error:",
+                    error
+                );
+
+                callback?.({
+                    success: false,
+                    message:
+                        error instanceof Error
+                            ? error.message
+                            : "Internal Server Error.",
+                });
+            }
+        }
+    );
+
+    /*
+     * ============================================================
+     * END GROUP CALL
+     * ============================================================
+     */
     socket.on(
         "group_call:end",
         async (
@@ -264,19 +835,6 @@ export function registerGroupCallEvents(
             callback
         ) => {
             try {
-                const allowed =
-                    await isParticipant(
-                        socket.userId,
-                        conversationId
-                    );
-
-                if (!allowed) {
-                    return callback?.({
-                        success: false,
-                        message: "Unauthorized",
-                    });
-                }
-
                 const activeCall =
                     await getActiveGroupCall(
                         conversationId
@@ -290,15 +848,34 @@ export function registerGroupCallEvents(
                     });
                 }
 
-                await endGroupCall(
-                    conversationId
-                );
-
                 const participants =
                     getGroupCallParticipants(
                         conversationId
                     );
 
+                /*
+                 * Only an actual call participant
+                 * can end the call.
+                 */
+                if (
+                    !participants.includes(
+                        socket.userId
+                    )
+                ) {
+                    return callback?.({
+                        success: false,
+                        message:
+                            "You are not part of the group call.",
+                    });
+                }
+
+                await endGroupCall(
+                    conversationId
+                );
+
+                /*
+                 * Remove all users from state.
+                 */
                 participants.forEach(
                     (userId) => {
                         leaveGroupCall(
@@ -308,8 +885,21 @@ export function registerGroupCallEvents(
                     }
                 );
 
+                /*
+                 * Remove pending invitations.
+                 */
+                clearGroupCallInvites(
+                    conversationId
+                );
+
+                /*
+                 * Notify participants BEFORE
+                 * removing them from the room.
+                 */
                 io.to(
-                    `group-call:${conversationId}`
+                    GROUP_CALL_ROOM(
+                        conversationId
+                    )
                 ).emit(
                     "group_call:ended",
                     {
@@ -317,25 +907,44 @@ export function registerGroupCallEvents(
                     }
                 );
 
-                socket.leave(
-                    `group-call:${conversationId}`
+                /*
+                 * Remove sockets from room.
+                 */
+                io.in(
+                    GROUP_CALL_ROOM(
+                        conversationId
+                    )
+                ).socketsLeave(
+                    GROUP_CALL_ROOM(
+                        conversationId
+                    )
                 );
 
                 callback?.({
                     success: true,
                 });
             } catch (error) {
+                console.error(
+                    "group_call:end error:",
+                    error
+                );
+
                 callback?.({
                     success: false,
                     message:
                         error instanceof Error
                             ? error.message
-                            : "Internal Server Error",
+                            : "Internal Server Error.",
                 });
             }
         }
     );
 
+    /*
+     * ============================================================
+     * LEAVE GROUP CALL
+     * ============================================================
+     */
     socket.on(
         "group_call:leave",
         async (
@@ -347,19 +956,6 @@ export function registerGroupCallEvents(
             callback
         ) => {
             try {
-                const allowed =
-                    await isParticipant(
-                        socket.userId,
-                        conversationId
-                    );
-
-                if (!allowed) {
-                    return callback?.({
-                        success: false,
-                        message: "Unauthorized",
-                    });
-                }
-
                 const activeCall =
                     await getActiveGroupCall(
                         conversationId
@@ -373,30 +969,64 @@ export function registerGroupCallEvents(
                     });
                 }
 
+                const participants =
+                    getGroupCallParticipants(
+                        conversationId
+                    );
+
+                if (
+                    !participants.includes(
+                        socket.userId
+                    )
+                ) {
+                    return callback?.({
+                        success: false,
+                        message:
+                            "You are not part of the group call.",
+                    });
+                }
+
                 leaveGroupCall(
                     conversationId,
                     socket.userId
                 );
 
-                socket.leave(
-                    `group-call:${conversationId}`
+                removeGroupCallInvite(
+                    conversationId,
+                    socket.userId
                 );
 
-                io.to(
-                    `group-call:${conversationId}`
-                ).emit(
-                    "group_call:user_left",
-                    {
-                        userId:
-                            socket.userId,
-                    }
+                socket.leave(
+                    GROUP_CALL_ROOM(
+                        conversationId
+                    )
                 );
+
+                /*
+                 * Notify remaining participants.
+                 */
+                socket
+                    .to(
+                        GROUP_CALL_ROOM(
+                            conversationId
+                        )
+                    )
+                    .emit(
+                        "group_call:user_left",
+                        {
+                            userId:
+                                socket.userId,
+                        }
+                    );
 
                 const remainingParticipants =
                     getGroupCallParticipants(
                         conversationId
                     );
 
+                /*
+                 * Nobody remains.
+                 */
                 if (
                     remainingParticipants.length ===
                     0
@@ -405,8 +1035,14 @@ export function registerGroupCallEvents(
                         conversationId
                     );
 
+                    clearGroupCallInvites(
+                        conversationId
+                    );
+
                     io.to(
-                        `group-call:${conversationId}`
+                        GROUP_CALL_ROOM(
+                            conversationId
+                        )
                     ).emit(
                         "group_call:ended",
                         {
@@ -419,17 +1055,27 @@ export function registerGroupCallEvents(
                     success: true,
                 });
             } catch (error) {
+                console.error(
+                    "group_call:leave error:",
+                    error
+                );
+
                 callback?.({
                     success: false,
                     message:
                         error instanceof Error
                             ? error.message
-                            : "Internal Server Error",
+                            : "Internal Server Error.",
                 });
             }
         }
     );
 
+    /*
+     * ============================================================
+     * CAMERA STATE
+     * ============================================================
+     */
     socket.on(
         "group_call:camera_state",
         async (
@@ -442,16 +1088,6 @@ export function registerGroupCallEvents(
             }
         ) => {
             try {
-                const allowed =
-                    await isParticipant(
-                        socket.userId,
-                        conversationId
-                    );
-
-                if (!allowed) {
-                    return;
-                }
-
                 const activeCall =
                     await getActiveGroupCall(
                         conversationId
@@ -461,8 +1097,25 @@ export function registerGroupCallEvents(
                     return;
                 }
 
+                const participants =
+                    getGroupCallParticipants(
+                        conversationId
+                    );
+
+                if (
+                    !participants.includes(
+                        socket.userId
+                    )
+                ) {
+                    return;
+                }
+
                 socket
-                    .to(`group-call:${conversationId}`)
+                    .to(
+                        GROUP_CALL_ROOM(
+                            conversationId
+                        )
+                    )
                     .emit(
                         "group_call:remote_camera_state",
                         {
@@ -480,6 +1133,11 @@ export function registerGroupCallEvents(
         }
     );
 
+    /*
+     * ============================================================
+     * MUTE STATE
+     * ============================================================
+     */
     socket.on(
         "group_call:mute_state",
         async (
@@ -492,16 +1150,6 @@ export function registerGroupCallEvents(
             }
         ) => {
             try {
-                const allowed =
-                    await isParticipant(
-                        socket.userId,
-                        conversationId
-                    );
-
-                if (!allowed) {
-                    return;
-                }
-
                 const activeCall =
                     await getActiveGroupCall(
                         conversationId
@@ -511,8 +1159,25 @@ export function registerGroupCallEvents(
                     return;
                 }
 
+                const participants =
+                    getGroupCallParticipants(
+                        conversationId
+                    );
+
+                if (
+                    !participants.includes(
+                        socket.userId
+                    )
+                ) {
+                    return;
+                }
+
                 socket
-                    .to(`group-call:${conversationId}`)
+                    .to(
+                        GROUP_CALL_ROOM(
+                            conversationId
+                        )
+                    )
                     .emit(
                         "group_call:remote_mute_state",
                         {

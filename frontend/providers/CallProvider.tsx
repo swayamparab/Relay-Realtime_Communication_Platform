@@ -11,6 +11,7 @@ import { IncomingCallDialog } from "@/components/call/IncomingCallDialog";
 import { CallingDialog } from "@/components/call/CallingDialog";
 import { VideoCallScreen } from "@/components/call/VideoCallScreen";
 import { RemoteAudio } from "@/components/call/RemoteAudio";
+import { VoiceCallScreen } from "@/components/call/VoiceCallScreen";
 
 export type CallType = "voice" | "video";
 
@@ -96,6 +97,7 @@ export function CallProvider({
             <IncomingCallDialog />
             <CallingDialog />
             <VideoCallScreen />
+            <VoiceCallScreen/>
         </CallContext.Provider>
     );
 }

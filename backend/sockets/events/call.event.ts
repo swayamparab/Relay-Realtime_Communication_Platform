@@ -166,4 +166,97 @@ export function registerCallEvents(io: Server, socket: Socket) {
         }
     );
 
+    socket.on(
+        "call:add_participant",
+        async (
+            {
+                conversationId,
+                participant,
+                type,
+            }: {
+                conversationId: string;
+                participant: {
+                    id: string;
+                    username: string;
+                };
+                type: "voice" | "video";
+            },
+            callback
+        ) => {
+            try {
+                const allowed =
+                    await isParticipant(
+                        socket.userId,
+                        conversationId
+                    );
+
+                if (!allowed) {
+                    return callback?.({
+                        success: false,
+                        message: "Unauthorized",
+                    });
+                }
+
+                if (participant.id === socket.userId) {
+                    return callback?.({
+                        success: false,
+                        message:
+                            "You cannot add yourself to the call.",
+                    });
+                }
+
+                if (!activeCalls.has(socket.userId)) {
+                    return callback?.({
+                        success: false,
+                        message: "You are not currently in a call.",
+                    });
+                }
+
+                if (activeCalls.has(participant.id)) {
+                    return callback?.({
+                        success: false,
+                        message:
+                            "User is already on another call.",
+                    });
+                }
+
+                const participantAllowed =
+                    await isParticipant(
+                        participant.id,
+                        conversationId
+                    );
+
+                if (!participantAllowed) {
+                    return callback?.({
+                        success: false,
+                        message:
+                            "User is not a member of this conversation.",
+                    });
+                }
+
+                io.to(participant.id).emit(
+                    "call_participant_invited",
+                    {
+                        conversationId,
+                        type,
+                        callerId: socket.userId,
+                        participant,
+                    }
+                );
+
+                callback?.({
+                    success: true,
+                });
+            } catch (error) {
+                callback?.({
+                    success: false,
+                    message:
+                        error instanceof Error
+                            ? error.message
+                            : "Internal Server Error",
+                });
+            }
+        }
+    );
+
 }

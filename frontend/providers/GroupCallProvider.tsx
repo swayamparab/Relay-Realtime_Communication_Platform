@@ -14,12 +14,20 @@ import { useGroupWebRTC } from "@/hooks/group-call/useGroupWebRTC";
 
 import { GroupCallScreen } from "@/components/group-call/GroupCallScreen";
 import { IncomingGroupCall } from "@/components/group-call/IncomingGroupCall";
+import { useCurrentUser } from "@/hooks/user/useCurrentUser";
 
 type CallType = "voice" | "video";
 
 type Participant = {
     id: string;
     username: string;
+};
+
+type IncomingCall = {
+    conversationId: string;
+    callerId: string;
+    callerUsername: string;
+    type: CallType;
 };
 
 type GroupCallContextType = {
@@ -43,11 +51,7 @@ type GroupCallContextType = {
 
     leaveCall: () => void;
 
-    incomingCall: {
-        conversationId: string;
-        callerId: string;
-        type: CallType;
-    } | null;
+    incomingCall: IncomingCall | null;
 
     declineCall: () => void;
 
@@ -80,7 +84,7 @@ export function GroupCallProvider({
         hasPeerConnection,
         cleanupWebRTC,
         setRemoteVideoStates,
-        setRemoteMuteStates
+        setRemoteMuteStates,
     } = useGroupWebRTC();
 
     const [inCall, setInCall] =
@@ -96,18 +100,18 @@ export function GroupCallProvider({
         useState<Participant[]>([]);
 
     const [incomingCall, setIncomingCall] =
-        useState<{
-            conversationId: string;
-            callerId: string;
-            type: CallType;
-        } | null>(null);
+        useState<IncomingCall | null>(null);
 
     const [isMinimized, setIsMinimized] =
         useState(false);
 
-    const declineCall = useCallback(() => {
-        setIncomingCall(null);
-    }, []);
+    const { data: currentUser } = useCurrentUser();
+
+    /*
+     * ============================================================
+     * CLEANUP
+     * ============================================================
+     */
 
     const cleanupCall = useCallback(() => {
         cleanupWebRTC();
@@ -126,6 +130,22 @@ export function GroupCallProvider({
         setWebRTCConversationId,
     ]);
 
+    /*
+     * ============================================================
+     * DECLINE
+     * ============================================================
+     */
+
+    const declineCall = useCallback(() => {
+        setIncomingCall(null);
+    }, []);
+
+    /*
+     * ============================================================
+     * LEAVE
+     * ============================================================
+     */
+
     const leaveCall = useCallback(() => {
         if (conversationId) {
             socket.emit(
@@ -142,6 +162,111 @@ export function GroupCallProvider({
         socket,
         cleanupCall,
     ]);
+
+    /*
+     * ============================================================
+     * PROMOTED 1-TO-1 → GROUP
+     * ============================================================
+     */
+
+    const onCallPromoted = useCallback(
+        async ({
+            conversationId:
+            eventConversationId,
+            type,
+            participants:
+            promotedParticipants,
+        }: {
+            conversationId: string;
+            type: CallType;
+            participants: Participant[];
+        }) => {
+            /*
+             * Ignore calls from another conversation.
+             */
+            if (
+                conversationId &&
+                eventConversationId !==
+                conversationId
+            ) {
+                return;
+            }
+
+            setConversationId(
+                eventConversationId
+            );
+
+            setWebRTCConversationId(
+                eventConversationId
+            );
+
+            setCallType(type);
+
+            setParticipants(
+                promotedParticipants
+            );
+
+            setInCall(true);
+
+            /*
+             * Existing participants need to
+             * establish group peer connections.
+             *
+             * We don't create offers to ourselves.
+             */
+
+            const otherParticipants =
+                promotedParticipants.filter(
+                    (participant) =>
+                        participant.id !==
+                        currentUser?.user.id
+                );
+
+            /*
+             * IMPORTANT:
+             *
+             * socket.id is the Socket.IO connection ID,
+             * NOT our application user ID.
+             *
+             * Therefore this list is only used as a
+             * fallback here. The actual user ID should
+             * ideally come from currentUser.
+             */
+
+            try {
+                for (const participant of
+                    otherParticipants) {
+                    if (
+                        !hasPeerConnection(
+                            participant.id
+                        )
+                    ) {
+                        await createOffer(
+                            participant.id
+                        );
+                    }
+                }
+            } catch (error) {
+                console.error(
+                    "Failed to establish promoted group call peers:",
+                    error
+                );
+            }
+        },
+        [
+            conversationId,
+            socket.id,
+            setWebRTCConversationId,
+            hasPeerConnection,
+            createOffer,
+        ]
+    );
+
+    /*
+     * ============================================================
+     * USER JOINED
+     * ============================================================
+     */
 
     const onUserJoined = useCallback(
         async ({
@@ -171,7 +296,13 @@ export function GroupCallProvider({
                 ];
             });
 
-            if (hasPeerConnection(userId)) {
+            /*
+             * Existing participants create
+             * an offer to the newly joined user.
+             */
+            if (
+                hasPeerConnection(userId)
+            ) {
                 return;
             }
 
@@ -186,9 +317,15 @@ export function GroupCallProvider({
         },
         [
             createOffer,
-            hasPeerConnection
+            hasPeerConnection,
         ]
     );
+
+    /*
+     * ============================================================
+     * USER LEFT
+     * ============================================================
+     */
 
     const onUserLeft = useCallback(
         ({
@@ -206,6 +343,12 @@ export function GroupCallProvider({
         },
         []
     );
+
+    /*
+     * ============================================================
+     * OFFER
+     * ============================================================
+     */
 
     const onOffer = useCallback(
         async ({
@@ -243,6 +386,12 @@ export function GroupCallProvider({
         ]
     );
 
+    /*
+     * ============================================================
+     * ANSWER
+     * ============================================================
+     */
+
     const onAnswer = useCallback(
         async ({
             senderId,
@@ -278,6 +427,12 @@ export function GroupCallProvider({
             handleAnswer,
         ]
     );
+
+    /*
+     * ============================================================
+     * ICE
+     * ============================================================
+     */
 
     const onIceCandidate = useCallback(
         async ({
@@ -315,16 +470,19 @@ export function GroupCallProvider({
         ]
     );
 
+    /*
+     * ============================================================
+     * NORMAL GROUP CALL INCOMING
+     * ============================================================
+     */
+
     const onIncomingCall = useCallback(
         ({
             conversationId,
             callerId,
+            callerUsername,
             type,
-        }: {
-            conversationId: string;
-            callerId: string;
-            type: CallType;
-        }) => {
+        }: IncomingCall) => {
             if (inCall) {
                 return;
             }
@@ -332,53 +490,124 @@ export function GroupCallProvider({
             setIncomingCall({
                 conversationId,
                 callerId,
+                callerUsername,
                 type,
             });
         },
         [inCall]
     );
 
+    /*
+     * ============================================================
+     * INVITED INTO EXISTING CALL
+     * ============================================================
+     */
+
+    const onParticipantInvited =
+        useCallback(
+            ({
+                conversationId,
+                callerId,
+                callerUsername,
+                type,
+            }: IncomingCall) => {
+                if (inCall) {
+                    return;
+                }
+
+                setIncomingCall({
+                    conversationId,
+                    callerId,
+                    callerUsername,
+                    type,
+                });
+
+                toast.info(
+                    `${callerUsername} invited you to a group call`
+                );
+            },
+            [inCall]
+        );
+
+    /*
+     * ============================================================
+     * CALL ENDED
+     * ============================================================
+     */
+
     const onCallEnded = useCallback(() => {
         cleanupCall();
     }, [cleanupCall]);
 
-    const onRemoteCameraState = useCallback(
-        ({
-            userId,
-            enabled,
-        }: {
-            userId: string;
-            enabled: boolean;
-        }) => {
-            setRemoteVideoStates((prev) => {
-                const next = new Map(prev);
+    /*
+     * ============================================================
+     * REMOTE CAMERA STATE
+     * ============================================================
+     */
 
-                next.set(userId, enabled);
+    const onRemoteCameraState =
+        useCallback(
+            ({
+                userId,
+                enabled,
+            }: {
+                userId: string;
+                enabled: boolean;
+            }) => {
+                setRemoteVideoStates(
+                    (prev) => {
+                        const next =
+                            new Map(prev);
 
-                return next;
-            });
-        },
-        [setRemoteVideoStates]
-    );
+                        next.set(
+                            userId,
+                            enabled
+                        );
 
-    const onRemoteMuteState = useCallback(
-        ({
-            userId,
-            muted,
-        }: {
-            userId: string;
-            muted: boolean;
-        }) => {
-            setRemoteMuteStates((prev) => {
-                const next = new Map(prev);
+                        return next;
+                    }
+                );
+            },
+            [setRemoteVideoStates]
+        );
 
-                next.set(userId, muted);
+    /*
+     * ============================================================
+     * REMOTE MUTE STATE
+     * ============================================================
+     */
 
-                return next;
-            });
-        },
-        [setRemoteMuteStates]
-    );
+    const onRemoteMuteState =
+        useCallback(
+            ({
+                userId,
+                muted,
+            }: {
+                userId: string;
+                muted: boolean;
+            }) => {
+                setRemoteMuteStates(
+                    (prev) => {
+                        const next =
+                            new Map(prev);
+
+                        next.set(
+                            userId,
+                            muted
+                        );
+
+                        return next;
+                    }
+                );
+            },
+            [setRemoteMuteStates]
+        );
+
+    /*
+     * ============================================================
+     * SOCKET EVENTS
+     * ============================================================
+     */
 
     useGroupCallEvents({
         onUserJoined,
@@ -389,8 +618,16 @@ export function GroupCallProvider({
         onIceCandidate,
         onIncomingCall,
         onRemoteCameraState,
-        onRemoteMuteState
+        onRemoteMuteState,
+        onCallPromoted,
+        onParticipantInvited,
     });
+
+    /*
+     * ============================================================
+     * START GROUP CALL
+     * ============================================================
+     */
 
     const startCall = useCallback(
         async (
@@ -448,6 +685,10 @@ export function GroupCallProvider({
                         []
                     );
 
+                    setCallType(
+                        response.type
+                    );
+
                     setInCall(true);
                 }
             );
@@ -459,6 +700,12 @@ export function GroupCallProvider({
             cleanupCall,
         ]
     );
+
+    /*
+     * ============================================================
+     * JOIN GROUP CALL
+     * ============================================================
+     */
 
     const joinCall = useCallback(
         async (
@@ -533,6 +780,12 @@ export function GroupCallProvider({
         ]
     );
 
+    /*
+     * ============================================================
+     * PROVIDER
+     * ============================================================
+     */
+
     return (
         <GroupCallContext.Provider
             value={{
@@ -549,7 +802,7 @@ export function GroupCallProvider({
                 declineCall,
 
                 isMinimized,
-                setIsMinimized
+                setIsMinimized,
             }}
         >
             <IncomingGroupCall />

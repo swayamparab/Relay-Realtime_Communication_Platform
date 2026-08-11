@@ -1,6 +1,12 @@
 "use client";
 
-import { Phone, Video, X } from "lucide-react";
+import {
+    Phone,
+    PhoneOff,
+    Video,
+} from "lucide-react";
+
+import { Button } from "@/components/ui/button";
 
 import { useGroupCall } from "@/hooks/group-call/useGroupCall";
 
@@ -18,62 +24,75 @@ export function IncomingGroupCall() {
     const isVideo =
         incomingCall.type === "video";
 
+    const handleAccept = () => {
+        joinCall(
+            incomingCall.conversationId,
+            incomingCall.type
+        );
+    };
+
     return (
-        <div className="fixed right-4 top-4 z-[100] w-[calc(100%-2rem)] max-w-sm overflow-hidden rounded-2xl border border-border bg-background/95 p-4 shadow-2xl backdrop-blur-xl sm:right-6 sm:top-6">
-            {/* Header */}
-            <div className="flex items-center gap-3">
-                <div className="flex size-12 shrink-0 items-center justify-center rounded-full bg-primary/10">
-                    {isVideo ? (
-                        <Video className="size-5 text-primary" />
-                    ) : (
-                        <Phone className="size-5 text-primary" />
-                    )}
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm">
+            <div className="w-full max-w-sm rounded-3xl border border-white/10 bg-slate-900 p-6 text-white shadow-2xl">
+                {/* Icon */}
+                <div className="flex justify-center">
+                    <div className="relative flex size-24 items-center justify-center rounded-full bg-emerald-500/15 ring-1 ring-emerald-500/20">
+                        <div className="absolute inset-0 animate-ping rounded-full bg-emerald-500/10" />
+
+                        {isVideo ? (
+                            <Video className="relative size-10 text-emerald-400" />
+                        ) : (
+                            <Phone className="relative size-10 text-emerald-400" />
+                        )}
+                    </div>
                 </div>
 
-                <div className="min-w-0 flex-1">
-                    <p className="font-semibold">
+                {/* Caller */}
+                <div className="mt-6 text-center">
+                    <p className="text-sm text-slate-400">
                         Incoming group call
                     </p>
 
-                    <p className="text-sm text-muted-foreground">
+                    <h2 className="mt-2 text-2xl font-semibold">
+                        {incomingCall.callerUsername}
+                    </h2>
+
+                    <p className="mt-2 text-sm text-slate-400">
                         {isVideo
-                            ? "Group video call"
-                            : "Group voice call"}
+                            ? "Video call"
+                            : "Voice call"}
                     </p>
                 </div>
 
-                <button
-                    type="button"
-                    onClick={declineCall}
-                    className="flex size-8 items-center justify-center rounded-full text-muted-foreground transition hover:bg-muted hover:text-foreground"
-                    aria-label="Dismiss call"
-                >
-                    <X className="size-4" />
-                </button>
-            </div>
+                {/* Actions */}
+                <div className="mt-8 flex items-center justify-center gap-5">
+                    {/* Decline */}
+                    <Button
+                        type="button"
+                        size="icon"
+                        variant="destructive"
+                        className="size-14 rounded-full bg-red-600 hover:bg-red-700"
+                        onClick={declineCall}
+                        aria-label="Decline group call"
+                    >
+                        <PhoneOff className="size-6" />
+                    </Button>
 
-            {/* Actions */}
-            <div className="mt-4 grid grid-cols-2 gap-2">
-                <button
-                    type="button"
-                    onClick={declineCall}
-                    className="rounded-xl bg-muted px-4 py-2.5 text-sm font-medium transition hover:bg-muted/80"
-                >
-                    Decline
-                </button>
-
-                <button
-                    type="button"
-                    onClick={() =>
-                        joinCall(
-                            incomingCall.conversationId,
-                            incomingCall.type
-                        )
-                    }
-                    className="rounded-xl bg-green-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-green-700"
-                >
-                    Join
-                </button>
+                    {/* Accept */}
+                    <Button
+                        type="button"
+                        size="icon"
+                        className="size-14 rounded-full bg-emerald-600 hover:bg-emerald-500"
+                        onClick={handleAccept}
+                        aria-label="Accept group call"
+                    >
+                        {isVideo ? (
+                            <Video className="size-6" />
+                        ) : (
+                            <Phone className="size-6" />
+                        )}
+                    </Button>
+                </div>
             </div>
         </div>
     );

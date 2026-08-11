@@ -1,12 +1,15 @@
 "use client";
 
-import { LocalVideo } from "@/components/call/LocalVideo";
-import { RemoteAudio } from "@/components/call/RemoteAudio";
-import { RemoteVideo } from "@/components/call/RemoteVideo";
 import { createContext, useMemo, useRef, useState } from "react";
 
 interface WebRTCContextType {
     peerConnection: React.MutableRefObject<RTCPeerConnection | null>
+
+    peerConnections: React.MutableRefObject<Map<string, RTCPeerConnection>>;
+
+    remoteStreams: Map<string, MediaStream>;
+
+    pendingPeerIceCandidates: React.MutableRefObject<Map<string, RTCIceCandidateInit[]>>;
 
     localStream: MediaStream | null;
     setLocalStream: React.Dispatch<React.SetStateAction<MediaStream | null>>;
@@ -15,6 +18,13 @@ interface WebRTCContextType {
     setRemoteStream: React.Dispatch<React.SetStateAction<MediaStream | null>>;
 
     createPeerConnection: () => RTCPeerConnection;
+
+    createParticipantPeerConnection: (
+        remoteUserId: string
+    ) => RTCPeerConnection;
+
+    closeParticipantPeerConnections: () => void;
+
     closePeerConnection: () => void;
 
     getLocalStream: (options: SetupLocalMediaOptions) => Promise<MediaStream>;
@@ -47,6 +57,12 @@ export const WebRTCContext = createContext<WebRTCContextType | null>(null);
 export function WebRTCProvider({ children }: { children: React.ReactNode }) {
 
     const peerConnection = useRef<RTCPeerConnection | null>(null);
+
+    const peerConnections = useRef(new Map<string, RTCPeerConnection>());
+
+    const [remoteStreams, setRemoteStreams] = useState<Map<string, MediaStream>>(new Map());
+
+    const pendingPeerIceCandidates = useRef(new Map<string, RTCIceCandidateInit[]>());
 
     const [localStream, setLocalStream] = useState<MediaStream | null>(null);
 
@@ -93,7 +109,57 @@ export function WebRTCProvider({ children }: { children: React.ReactNode }) {
         return peer;
     }
 
+    function createParticipantPeerConnection(
+        remoteUserId: string
+    ) {
+        const existing =
+            peerConnections.current.get(
+                remoteUserId
+            );
+
+        if (existing) {
+            return existing;
+        }
+
+        const peer = new RTCPeerConnection({
+            iceServers: [
+                {
+                    urls: "stun:stun.l.google.com:19302",
+                },
+            ],
+        });
+
+        peer.ontrack = (event) => {
+            const stream = event.streams[0];
+
+            if (!stream) {
+                return;
+            }
+
+            setRemoteStreams((prev) => {
+                const next = new Map(prev);
+
+                next.set(
+                    remoteUserId,
+                    stream
+                );
+
+                return next;
+            });
+        };
+
+        peerConnections.current.set(
+            remoteUserId,
+            peer
+        );
+
+        return peer;
+    }
+
     function closePeerConnection() {
+
+        closeParticipantPeerConnections();
+
         localStream?.getTracks().forEach((track) => {
             track.stop();
         });
@@ -116,6 +182,20 @@ export function WebRTCProvider({ children }: { children: React.ReactNode }) {
         setIsCameraOff(false);
 
         setRemoteCameraOff(false);
+    }
+
+    function closeParticipantPeerConnections() {
+        peerConnections.current.forEach(
+            (peer) => {
+                peer.close();
+            }
+        );
+
+        peerConnections.current.clear();
+
+        pendingPeerIceCandidates.current.clear();
+
+        setRemoteStreams(new Map());
     }
 
     async function getLocalStream(options: SetupLocalMediaOptions) {
@@ -161,6 +241,14 @@ export function WebRTCProvider({ children }: { children: React.ReactNode }) {
         () => ({
             peerConnection,
 
+            peerConnections,
+            remoteStreams,
+
+            pendingPeerIceCandidates,
+
+            createParticipantPeerConnection,
+            closeParticipantPeerConnections,
+
             localStream,
             setLocalStream,
 
@@ -189,7 +277,18 @@ export function WebRTCProvider({ children }: { children: React.ReactNode }) {
             cameraFacingMode,
             setCameraFacingMode,
         }),
-        [localStream, remoteStream, connectionState, isMuted, isCameraOff, remoteCameraOff, cameraFacingMode]
+        [
+            localStream,
+            remoteStream,
+            remoteStreams,
+            connectionState,
+            isMuted,
+            isCameraOff,
+            remoteCameraOff,
+            cameraFacingMode,
+            createParticipantPeerConnection,
+            closeParticipantPeerConnections,
+        ]
     );
 
     return (

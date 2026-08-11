@@ -4,6 +4,13 @@ import { useEffect } from "react";
 
 import { useSocket } from "@/hooks/useSocket";
 
+type CallType = "voice" | "video";
+
+type Participant = {
+    id: string;
+    username: string;
+};
+
 type Props = {
     onUserJoined: (data: {
         userId: string;
@@ -37,7 +44,21 @@ type Props = {
     onIncomingCall: (data: {
         conversationId: string;
         callerId: string;
-        type: "voice" | "video";
+        callerUsername: string;
+        type: CallType;
+    }) => void;
+
+    onCallPromoted: (data: {
+        conversationId: string;
+        type: CallType;
+        participants: Participant[];
+    }) => void;
+
+    onParticipantInvited: (data: {
+        conversationId: string;
+        callerId: string;
+        callerUsername: string;
+        type: CallType;
     }) => void;
 
     onRemoteCameraState: (data: {
@@ -59,12 +80,18 @@ export function useGroupCallEvents({
     onAnswer,
     onIceCandidate,
     onIncomingCall,
+    onCallPromoted,
+    onParticipantInvited,
     onRemoteCameraState,
-    onRemoteMuteState
+    onRemoteMuteState,
 }: Props) {
     const { socket } = useSocket();
 
     useEffect(() => {
+        if (!socket) {
+            return;
+        }
+
         socket.on(
             "group_call:user_joined",
             onUserJoined
@@ -98,6 +125,16 @@ export function useGroupCallEvents({
         socket.on(
             "group_call:incoming",
             onIncomingCall
+        );
+
+        socket.on(
+            "group_call:promoted",
+            onCallPromoted
+        );
+
+        socket.on(
+            "group_call:participant_invited",
+            onParticipantInvited
         );
 
         socket.on(
@@ -147,6 +184,16 @@ export function useGroupCallEvents({
             );
 
             socket.off(
+                "group_call:promoted",
+                onCallPromoted
+            );
+
+            socket.off(
+                "group_call:participant_invited",
+                onParticipantInvited
+            );
+
+            socket.off(
                 "group_call:remote_camera_state",
                 onRemoteCameraState
             );
@@ -165,7 +212,9 @@ export function useGroupCallEvents({
         onAnswer,
         onIceCandidate,
         onIncomingCall,
+        onCallPromoted,
+        onParticipantInvited,
         onRemoteCameraState,
-        onRemoteMuteState
+        onRemoteMuteState,
     ]);
 }
