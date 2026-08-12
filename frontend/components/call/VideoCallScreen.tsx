@@ -7,8 +7,11 @@ import {
     Video,
     VideoOff,
     Minimize2,
-    RefreshCw
+    RefreshCw,
+    UserPlus,
 } from "lucide-react";
+
+import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 
@@ -22,27 +25,46 @@ import { useWebRTCActions } from "@/hooks/webrtc/useWebRTCActions";
 import { LocalVideo } from "./LocalVideo";
 import { RemoteVideo } from "./RemoteVideo";
 import { FloatingVideoCall } from "./FloatingVideoCall";
+import { AddParticipantDialog } from "./AddParticipantDialog";
 
 export function VideoCallScreen() {
+    const [isAddParticipantOpen, setIsAddParticipantOpen] =
+        useState(false);
+
     const {
         callState,
         isVideoMinimized,
         setIsVideoMinimized,
     } = useCall();
 
-    const { data: currentUser } = useCurrentUser();
+    const { data: currentUser } =
+        useCurrentUser();
 
-    const duration = useCallDuration(callState.connectedAt);
+    const duration = useCallDuration(
+        callState.connectedAt
+    );
 
-    const { endCall } = useCallActions();
+    const { endCall } =
+        useCallActions();
 
-    const { toggleMute, toggleCamera, switchCamera } = useWebRTCActions();
+    const {
+        toggleMute,
+        toggleCamera,
+        switchCamera,
+    } = useWebRTCActions();
 
-    const { isMuted, isCameraOff } = useWebRTC();
+    const {
+        isMuted,
+        isCameraOff,
+    } = useWebRTC();
 
-    if (!currentUser) return null;
+    if (!currentUser) {
+        return null;
+    }
 
-    if (callState.type !== "video") return null;
+    if (callState.type !== "video") {
+        return null;
+    }
 
     if (
         callState.status !== "connecting" &&
@@ -56,7 +78,8 @@ export function VideoCallScreen() {
     }
 
     const remoteUser =
-        currentUser.user.id === callState.caller.id
+        currentUser.user.id ===
+            callState.caller.id
             ? callState.receiver
             : callState.caller;
 
@@ -88,13 +111,15 @@ export function VideoCallScreen() {
                     </p>
 
                     <p className="mt-1 text-sm text-slate-300">
-                        {callState.status === "connecting"
+                        {callState.status ===
+                            "connecting"
                             ? "Connecting..."
                             : duration}
                     </p>
                 </div>
 
                 <button
+                    type="button"
                     onClick={(e) => {
                         e.stopPropagation();
                         setIsVideoMinimized(true);
@@ -107,6 +132,7 @@ export function VideoCallScreen() {
                         transition
                         hover:bg-black/60
                     "
+                    aria-label="Minimize call"
                 >
                     <Minimize2 className="h-5 w-5" />
                 </button>
@@ -151,17 +177,24 @@ export function VideoCallScreen() {
                     backdrop-blur-2xl
                 "
             >
+                {/* Mute */}
                 <Button
+                    type="button"
                     size="icon"
                     variant="secondary"
                     className={`rounded-full ${isMuted
-                        ? "bg-red-500 text-white hover:bg-red-600"
-                        : ""
+                            ? "bg-red-500 text-white hover:bg-red-600"
+                            : ""
                         }`}
                     onClick={(e) => {
                         e.stopPropagation();
                         toggleMute();
                     }}
+                    aria-label={
+                        isMuted
+                            ? "Unmute microphone"
+                            : "Mute microphone"
+                    }
                 >
                     {isMuted ? (
                         <MicOff className="h-5 w-5" />
@@ -170,17 +203,24 @@ export function VideoCallScreen() {
                     )}
                 </Button>
 
+                {/* Camera */}
                 <Button
+                    type="button"
                     size="icon"
                     variant="secondary"
                     className={`rounded-full ${isCameraOff
-                        ? "bg-red-500 text-white hover:bg-red-600"
-                        : ""
+                            ? "bg-red-500 text-white hover:bg-red-600"
+                            : ""
                         }`}
                     onClick={(e) => {
                         e.stopPropagation();
                         toggleCamera();
                     }}
+                    aria-label={
+                        isCameraOff
+                            ? "Turn camera on"
+                            : "Turn camera off"
+                    }
                 >
                     {isCameraOff ? (
                         <VideoOff className="h-5 w-5" />
@@ -188,9 +228,15 @@ export function VideoCallScreen() {
                         <Video className="h-5 w-5" />
                     )}
                 </Button>
-                {typeof navigator !== "undefined" &&
-                    navigator.userAgent.includes("Mobile") && (
+
+                {/* Switch Camera - Mobile */}
+                {typeof navigator !==
+                    "undefined" &&
+                    navigator.userAgent.includes(
+                        "Mobile"
+                    ) && (
                         <Button
+                            type="button"
                             size="icon"
                             variant="secondary"
                             className="rounded-full"
@@ -198,23 +244,62 @@ export function VideoCallScreen() {
                                 e.stopPropagation();
                                 switchCamera();
                             }}
+                            aria-label="Switch camera"
                         >
                             <RefreshCw className="h-5 w-5" />
                         </Button>
-                    )
-                }
+                    )}
+
+                {/* Add Participant */}
                 <Button
+                    type="button"
+                    size="icon"
+                    variant="secondary"
+                    className="
+                        rounded-full
+                        bg-slate-800
+                        text-white
+                        hover:bg-slate-700
+                    "
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        setIsAddParticipantOpen(true);
+                    }}
+                    aria-label="Add participant"
+                    title="Add participant"
+                >
+                    <UserPlus className="h-5 w-5" />
+                </Button>
+
+                {/* End Call */}
+                <Button
+                    type="button"
                     size="icon"
                     variant="destructive"
                     className="rounded-full"
                     onClick={(e) => {
                         e.stopPropagation();
-                        endCall(callState.conversationId);
+                        endCall(
+                            callState.conversationId
+                        );
                     }}
+                    aria-label="End call"
                 >
                     <PhoneOff className="h-5 w-5" />
                 </Button>
             </div>
+
+            {/* Add Participant Dialog */}
+            {isAddParticipantOpen && (
+                <AddParticipantDialog
+                    open={
+                        isAddParticipantOpen
+                    }
+                    onOpenChange={
+                        setIsAddParticipantOpen
+                    }
+                />
+            )}
         </div>
     );
 }
