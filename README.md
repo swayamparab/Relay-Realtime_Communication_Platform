@@ -209,6 +209,7 @@ Relay is a production-style communication platform featuring secure authenticati
 - Group call termination
 - Dynamic 1-to-1 → group call promotion
 - WebRTC peer-to-peer media
+- WebRTC mesh architecture
 - Per-participant WebRTC peer connections
 - Socket.IO signaling
 - STUN-based connection establishment
@@ -243,6 +244,26 @@ Create Group Call
               │
               ▼
          Group Call
+
+## Call State Transition
+
+One-to-one calls use runtime Socket.IO/in-memory call state through `activeCalls`.
+
+When a call is promoted, the backend creates a persistent `group_calls` record and moves the existing participants into the group-call runtime state.
+
+The group call then uses:
+
+- `group_calls` for persistent group-call lifecycle state
+- `group-call-state` for runtime participant tracking
+- `group-call-invites` for pending invitation state
+- Socket.IO rooms for real-time group communication
+- WebRTC for peer-to-peer media
+- Reusable local `MediaStream` across call transitions
+- Per-participant `RTCPeerConnection` management
+- Socket.IO signaling for WebRTC
+- STUN-based NAT traversal
+
+The PostgreSQL `group_calls` record tracks the group-call lifecycle; audio and video media are transmitted through WebRTC and are not stored in the database.
 
 ---
 
@@ -375,6 +396,11 @@ Create Group Call
 - Fully typed TypeScript codebase
 - Modular React hooks architecture
 - Responsive mobile-first UI
+- Deterministic WebRTC offerer selection using participant user IDs
+- Queued ICE candidate handling until remote descriptions are available
+- Remote media stream management using per-participant Maps
+
+---
 
 # Project Structure
 
