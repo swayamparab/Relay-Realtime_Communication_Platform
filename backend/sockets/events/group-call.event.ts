@@ -113,19 +113,20 @@ export function registerGroupCallEvents(
                 }
 
                 /*
-                 * Target must belong to conversation.
-                 */
-                const targetAllowed =
-                    await isParticipant(
-                        userId,
-                        conversationId
-                    );
+                * Target user must exist.
+                */
+                const targetUser = await db.query.users.findFirst({
+                    where: eq(users.id, userId),
+                    columns: {
+                        id: true,
+                        username: true,
+                    },
+                });
 
-                if (!targetAllowed) {
+                if (!targetUser) {
                     return callback?.({
                         success: false,
-                        message:
-                            "User is not a conversation participant.",
+                        message: "User not found.",
                     });
                 }
 
