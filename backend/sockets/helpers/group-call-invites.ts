@@ -60,3 +60,13 @@ export function clearGroupCallInvites(
         conversationId
     );
 }
+
+export function getGroupCallInvitedUsers(
+    conversationId: string
+) {
+    return Array.from(
+        groupCallInvites.get(
+            conversationId
+        ) ?? []
+    );
+}

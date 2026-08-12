@@ -8,6 +8,7 @@ import {
 
 import {
     Maximize2,
+    Phone,
     PhoneOff,
     Video,
 } from "lucide-react";
@@ -204,7 +205,11 @@ export function GroupCallMini() {
 
                 {/* Call type */}
                 <div className="absolute bottom-2 left-2 flex items-center gap-1.5 rounded-lg bg-black/60 px-2 py-1 text-[11px] font-medium text-white backdrop-blur-md">
-                    <Video className="size-3" />
+                    {callType === "video" ? (
+                        <Video className="size-3" />
+                    ) : (
+                        <Phone className="size-3" />
+                    )}
 
                     <span>
                         Group {callType}

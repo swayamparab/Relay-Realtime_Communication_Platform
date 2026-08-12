@@ -17,6 +17,7 @@ import {
     hasGroupCallInvite,
     removeGroupCallInvite,
     clearGroupCallInvites,
+    getGroupCallInvitedUsers,
 } from "../helpers/group-call-invites";
 
 import {
@@ -579,6 +580,8 @@ export function registerGroupCallEvents(
                     )
                 );
 
+                const callerUsername = await getUsername(socket.userId);
+
                 /*
                  * Notify other conversation members.
                  */
@@ -588,8 +591,8 @@ export function registerGroupCallEvents(
                         "group_call:incoming",
                         {
                             conversationId,
-                            callerId:
-                                socket.userId,
+                            callerId: socket.userId,
+                            callerUsername,
                             type,
                         }
                     );
@@ -886,6 +889,11 @@ export function registerGroupCallEvents(
                     }
                 );
 
+                const invitedUsers =
+                    getGroupCallInvitedUsers(
+                        conversationId
+                    );
+
                 /*
                  * Remove pending invitations.
                  */
@@ -1035,6 +1043,11 @@ export function registerGroupCallEvents(
                     await endGroupCall(
                         conversationId
                     );
+
+                    const invitedUsers =
+                        getGroupCallInvitedUsers(
+                            conversationId
+                        );
 
                     clearGroupCallInvites(
                         conversationId

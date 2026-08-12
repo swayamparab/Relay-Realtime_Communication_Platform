@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { VideoTile } from "./VideoTile";
 
 import { useGroupCall } from "@/hooks/group-call/useGroupCall";
@@ -51,6 +51,13 @@ export function GroupCallScreen() {
     if (isMinimized) {
         return <GroupCallMini />;
     }
+
+    useEffect(() => {
+        if (!inCall) {
+            setIsMuted(false);
+            setIsCameraOff(false);
+        }
+    }, [inCall, conversationId]);
 
     const remoteEntries =
         Array.from(remoteStreams.entries());

@@ -885,7 +885,7 @@ export function GroupCallProvider({
                 {
                     conversationId,
                 },
-                (response: {
+                async (response: {
                     success: boolean;
                     message?: string;
                     participants?: Participant[];
@@ -916,6 +916,32 @@ export function GroupCallProvider({
                     setInCall(true);
 
                     setIncomingCall(null);
+
+                    const localUserId = currentUser?.user.id;
+
+                    if (localUserId) {
+                        const otherParticipants =
+                            (response.participants ?? []).filter(
+                                (participant) =>
+                                    participant.id !== localUserId
+                            );
+
+                        for (const participant of otherParticipants) {
+                            if (hasPeerConnection(participant.id)) {
+                                continue;
+                            }
+
+                            try {
+                                await createOffer(participant.id);
+                            } catch (error) {
+                                console.error(
+                                    "Failed to create group call offer:",
+                                    participant.id,
+                                    error
+                                );
+                            }
+                        }
+                    }
                 }
             );
         },

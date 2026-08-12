@@ -53,29 +53,29 @@ export function RemoteVideo() {
             {remoteCameraOff && (
                 <div
                     className="
-                    absolute
-                    inset-0
-                    flex
-                    items-center
-                    justify-center
-                    bg-slate-950
-                "
+                        absolute
+                        inset-0
+                        flex
+                        items-center
+                        justify-center
+                        bg-slate-950
+                    "
                 >
                     <div className="text-center">
                         <div
                             className="
-                            mx-auto
-                            flex
-                            h-28
-                            w-28
-                            items-center
-                            justify-center
-                            rounded-full
-                            bg-slate-800
-                            text-5xl
-                            font-semibold
-                            text-white
-                        "
+                                mx-auto
+                                flex
+                                h-28
+                                w-28
+                                items-center
+                                justify-center
+                                rounded-full
+                                bg-slate-800
+                                text-5xl
+                                font-semibold
+                                text-white
+                            "
                         >
                             {remoteUser.username
                                 .charAt(0)

@@ -13,8 +13,6 @@ import { useWebRTCActions } from "../webrtc/useWebRTCActions";
 import { useWebRTC } from "../webrtc/useWebRTC";
 import { useRingtone } from "./useRingtone";
 
-import { useGroupWebRTC } from "../group-call/useGroupWebRTC";
-
 export function useCallEvents() {
     const { socket } = useSocket();
 
@@ -28,14 +26,8 @@ export function useCallEvents() {
         useWebRTCActions();
 
     const {
-        localStream,
-        closePrimaryPeerConnection,
         closePeerConnection,
     } = useWebRTC();
-
-    const {
-        adoptLocalStream,
-    } = useGroupWebRTC();
 
     const {
         playIncoming,
@@ -202,21 +194,18 @@ export function useCallEvents() {
          * 1-TO-1 → GROUP CALL PROMOTION
          * ============================================================
          *
-         * IMPORTANT:
+         * GroupCallProvider owns the actual transition:
          *
-         * We must NOT call closePeerConnection() here.
-         *
-         * closePeerConnection() stops the local
-         * microphone/camera tracks.
-         *
-         * Instead:
-         *
+         *     existing 1-to-1 stream
+         *              ↓
          *     adoptLocalStream()
-         *          ↓
+         *              ↓
          *     closePrimaryPeerConnection()
+         *              ↓
+         *     group WebRTC peers
          *
-         * The existing MediaStream stays alive and is
-         * transferred to GroupWebRTCProvider.
+         * This handler only cleans up the old
+         * 1-to-1 call UI/state.
          */
 
         function handleGroupCallPromoted(
@@ -229,29 +218,14 @@ export function useCallEvents() {
                 }[];
             }
         ) {
-            console.log(
-                "[CallEvents] 1-to-1 promoted to group call:",
-                data
-            );
-
             /*
-             * Transfer the existing microphone/camera
-             * stream to the group WebRTC provider.
+             * GroupCallProvider handles the actual
+             * 1-to-1 → group WebRTC transition.
+             *
+             * This handler only cleans up the
+             * old 1-to-1 call UI/state.
              */
-            if (localStream) {
-                adoptLocalStream(
-                    localStream,
-                    data.conversationId
-                );
-            } else {
-                console.warn(
-                    "[CallEvents] No local stream available during group promotion."
-                );
-            }
 
-            /*
-             * Stop the outgoing ringtone.
-             */
             stopOutgoing();
 
             /*
@@ -266,21 +240,7 @@ export function useCallEvents() {
             }
 
             /*
-             * IMPORTANT:
-             *
-             * Close ONLY the old 1-to-1 peer.
-             *
-             * This does NOT stop local microphone/camera.
-             */
-            closePrimaryPeerConnection();
-
-            /*
-             * The group call now owns the active
-             * media stream.
-             *
-             * GroupCallProvider receives the same
-             * group_call:promoted event and starts
-             * the group WebRTC connections.
+             * GroupCallProvider now owns the call.
              */
             setCallState(
                 initialCallState
@@ -366,10 +326,7 @@ export function useCallEvents() {
         socket,
         setCallState,
         createOffer,
-        closePrimaryPeerConnection,
         closePeerConnection,
-        localStream,
-        adoptLocalStream,
         playIncoming,
         stopIncoming,
         stopOutgoing,
