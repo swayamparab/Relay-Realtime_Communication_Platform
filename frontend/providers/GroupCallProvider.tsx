@@ -950,6 +950,9 @@ export function GroupCallProvider({
             getLocalStream,
             setWebRTCConversationId,
             cleanupCall,
+            currentUser?.user.id,
+            hasPeerConnection,
+            createOffer,
         ]
     );
 
@@ -978,9 +981,9 @@ export function GroupCallProvider({
                 setIsMinimized,
             }}
         >
-            <IncomingGroupCall />
+            {/* <IncomingGroupCall />
 
-            <GroupCallScreen />
+            <GroupCallScreen /> */}
 
             {children}
         </GroupCallContext.Provider>
