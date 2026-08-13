@@ -983,7 +983,7 @@ export function GroupCallProvider({
         >
             <IncomingGroupCall />
 
-            {/* <GroupCallScreen /> */}
+            <GroupCallScreen />
 
             {children}
         </GroupCallContext.Provider>
