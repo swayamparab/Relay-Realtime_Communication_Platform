@@ -44,6 +44,13 @@ export function GroupCallScreen() {
     const [isCameraOff, setIsCameraOff] =
         useState(false);
 
+    useEffect(() => {
+        if (!inCall) {
+            setIsMuted(false);
+            setIsCameraOff(false);
+        }
+    }, [inCall, conversationId]);
+
     if (!inCall) {
         return null;
     }
@@ -51,13 +58,6 @@ export function GroupCallScreen() {
     if (isMinimized) {
         return <GroupCallMini />;
     }
-
-    useEffect(() => {
-        if (!inCall) {
-            setIsMuted(false);
-            setIsCameraOff(false);
-        }
-    }, [inCall, conversationId]);
 
     const remoteEntries =
         Array.from(remoteStreams.entries());
