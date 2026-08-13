@@ -981,9 +981,9 @@ export function GroupCallProvider({
                 setIsMinimized,
             }}
         >
-            {/* <IncomingGroupCall /> */}
+            <IncomingGroupCall />
 
-            <GroupCallScreen />
+            {/* <GroupCallScreen /> */}
 
             {children}
         </GroupCallContext.Provider>
