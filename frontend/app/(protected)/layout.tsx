@@ -6,12 +6,13 @@ import { useRouter } from "next/navigation";
 import { useCurrentUser } from "@/hooks/user/useCurrentUser";
 import { useSocket } from "@/hooks/useSocket";
 
+import { PushNotifications } from "@/components/notifications/PushNotifications";
+
 export default function ChatLayout({
     children,
 }: {
     children: React.ReactNode;
 }) {
-
     const router = useRouter();
 
     const {
@@ -26,7 +27,11 @@ export default function ChatLayout({
         if (!isLoading && isError) {
             router.replace("/login");
         }
-    }, [isLoading, isError, router]);
+    }, [
+        isLoading,
+        isError,
+        router,
+    ]);
 
     useEffect(() => {
         if (data && !socket.connected) {
@@ -51,8 +56,10 @@ export default function ChatLayout({
     }
 
     return (
-    <div className="flex h-[100dvh] flex-col overflow-hidden">
-        {children}
-    </div>
-);
+        <div className="flex h-[100dvh] flex-col overflow-hidden">
+            <PushNotifications />
+
+            {children}
+        </div>
+    );
 }
