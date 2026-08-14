@@ -17,6 +17,7 @@ import {
   Phone,
   Search,
   Mic,
+  LoaderCircle
 } from "lucide-react";
 
 import LoginButton from "@/components/auth/LoginButton";
@@ -36,8 +37,46 @@ export default function HomePage() {
 
   if (isLoading) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-slate-950 text-white">
-        Loading... May take upto 30 secs.
+      <main className="relative flex min-h-[100dvh] items-center justify-center overflow-hidden bg-slate-950 px-5 text-white">
+
+        {/* Background glow */}
+        <div className="pointer-events-none absolute left-1/2 top-0 h-72 w-72 -translate-x-1/2 rounded-full bg-blue-600/15 blur-3xl sm:h-80 sm:w-80" />
+
+        <div className="pointer-events-none absolute bottom-0 right-0 h-64 w-64 rounded-full bg-cyan-500/10 blur-3xl" />
+
+        <div className="relative z-10 flex w-full max-w-sm flex-col items-center text-center">
+
+          {/* Logo */}
+          <h1 className="text-5xl font-extrabold tracking-tight sm:text-6xl">
+            Re<span className="text-blue-500">lay</span>
+          </h1>
+
+          <p className="mt-3 text-xs text-slate-500 sm:text-sm">
+            Real-time communication platform
+          </p>
+
+          {/* Lucide Spinner */}
+          <LoaderCircle
+            className="mt-12 size-12 animate-spin text-blue-500 sm:size-14"
+            strokeWidth={2}
+          />
+
+          {/* Loading text */}
+          <p className="mt-7 text-base font-medium text-slate-200 sm:text-lg">
+            Loading Relay
+          </p>
+
+          <p className="mt-2 text-xs text-slate-500 sm:text-sm">
+            Connecting to your chats...
+          </p>
+
+          {/* Status */}
+          <div className="mt-6 flex items-center gap-2 text-[11px] text-slate-600 sm:text-xs">
+            <span className="size-1.5 animate-pulse rounded-full bg-blue-500" />
+            Checking your session
+          </div>
+
+        </div>
       </main>
     );
   }
