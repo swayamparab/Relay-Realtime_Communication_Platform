@@ -7,6 +7,7 @@ import chatRequestRoutes from "./modules/chat-request/chat-request.routes";
 import conversationRoutes from "./modules/conversation/conversation.routes";
 import messagesRoutes from "./modules/message/message.routes";
 import userRoutes from "./modules/users/user.routes";
+import pushRoutes from "./modules/push-notifications/push-notifications.routes";
 
 const app = express();
 
@@ -34,5 +35,7 @@ app.use("/api/conversations", conversationRoutes);
 app.use("/api/conversations", messagesRoutes);
 
 app.use("/api/users", userRoutes);
+
+app.use("/api/push-notifications",pushRoutes);
 
 export default app;

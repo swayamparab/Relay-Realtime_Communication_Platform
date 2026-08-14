@@ -127,6 +127,13 @@
       "when": 1786127793775,
       "tag": "0017_fuzzy_goliath",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1786723211211,
+      "tag": "0018_hot_johnny_blaze",
+      "breakpoints": true
     }
   ]
 }
