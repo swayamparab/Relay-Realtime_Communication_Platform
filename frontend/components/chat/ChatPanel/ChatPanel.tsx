@@ -32,6 +32,18 @@ export default function ChatPanel() {
     }, [conversationId, markConversationAsRead]);
 
     useEffect(() => {
+        if (!conversationId) return;
+
+        socket.emit("conversation:view", {
+            conversationId,
+        });
+
+        return () => {
+            socket.emit("conversation:leave");
+        };
+    }, [socket, conversationId]);
+
+    useEffect(() => {
         function handleTyping(data: {
             conversationId: string;
             userId: string;

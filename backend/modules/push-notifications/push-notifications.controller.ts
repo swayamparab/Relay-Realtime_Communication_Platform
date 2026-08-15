@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 
-import { savePushSubscription } from "./push-notifications.service";
+import { savePushSubscription, sendPushToUser } from "./push-notifications.service";
 
 export async function subscribeToPush(
     req: Request,
@@ -57,3 +57,46 @@ export async function subscribeToPush(
         });
     }
 }
+
+
+
+// export async function testPushNotification(
+//     req: Request,
+//     res: Response
+// ) {
+//     try {
+//         const userId = req.userId;
+
+//         if (!userId) {
+//             return res.status(401).json({
+//                 message: "Unauthorized",
+//             });
+//         }
+
+//         const sent =
+//             await sendPushToUser(
+//                 userId,
+//                 {
+//                     type: "test",
+//                     title: "Relay",
+//                     body: "Push notifications are working! 🎉",
+//                     url: "/chat",
+//                 }
+//             );
+
+//         return res.json({
+//             success: true,
+//             sent,
+//         });
+//     } catch (error) {
+//         console.error(
+//             "Test push error:",
+//             error
+//         );
+
+//         return res.status(500).json({
+//             message:
+//                 "Failed to send test notification.",
+//         });
+//     }
+// }

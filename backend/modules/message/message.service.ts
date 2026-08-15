@@ -3,6 +3,8 @@ import { CreateMessageInput, deleteMessageInput, EditMessageInput, GetMessagesIn
 import { conversationParticipants, conversations, messages } from "../../db/schema";
 import { and, eq, lt, ne } from "drizzle-orm";
 import cloudinary from "../../lib/cloudinary";
+import { notifyNewMessage } from "../push-notifications/push-notifications.service";
+import { isUserViewingConversation } from "../../sockets/helpers/active-conversations";
 
 export async function getMessages(
     userId: string,
@@ -234,6 +236,50 @@ export async function sendMessage(userId: string, data: CreateMessageInput) {
         return message;
     });
 
+    const otherParticipant =
+        await db.query.conversationParticipants.findFirst({
+            where: and(
+                eq(
+                    conversationParticipants.conversationId,
+                    data.conversationId
+                ),
+                ne(
+                    conversationParticipants.userId,
+                    userId
+                )
+            ),
+            columns: {
+                userId: true,
+            },
+        });
+
+    if (otherParticipant) {
+        const isViewing =
+            isUserViewingConversation(
+                otherParticipant.userId,
+                data.conversationId
+            );
+
+        if (!isViewing) {
+            await notifyNewMessage(
+                otherParticipant.userId,
+                {
+                    senderUsername:
+                        message.sender.username,
+
+                    message:
+                        message.content ??
+                        getNotificationMessage(
+                            message.type
+                        ),
+
+                    conversationId:
+                        data.conversationId,
+                }
+            );
+        }
+    }
+
     return message;
 }
 
@@ -354,4 +400,23 @@ export async function editMessage(userId: string, data: EditMessageInput) {
 
     return fullMessage;
 
+}
+
+function getNotificationMessage(type: string) {
+    switch (type) {
+        case "image":
+            return "📷 Image";
+
+        case "video":
+            return "🎥 Video";
+
+        case "file":
+            return "📎 File";
+
+        case "voice":
+            return "🎤 Voice message";
+
+        default:
+            return "New message";
+    }
 }

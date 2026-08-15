@@ -1,5 +1,6 @@
 import { isParticipant, markConversationAsRead } from "../../modules/conversation/conversation.service";
 import { Server, Socket } from "socket.io";
+import { clearActiveConversation, setActiveConversation } from "../helpers/active-conversations";
 
 export function registerConversationEvents(io: Server, socket: Socket) {
     socket.on("join_conversation", async ({ conversationId }, callback) => {
@@ -64,6 +65,29 @@ export function registerConversationEvents(io: Server, socket: Socket) {
                             : "Internal Server Error",
                 });
             }
+        }
+    );
+
+    socket.on(
+        "conversation:view",
+        ({
+            conversationId,
+        }: {
+            conversationId: string;
+        }) => {
+            setActiveConversation(
+                socket.userId,
+                conversationId
+            );
+        }
+    );
+
+    socket.on(
+        "conversation:leave",
+        () => {
+            clearActiveConversation(
+                socket.userId
+            );
         }
     );
 }

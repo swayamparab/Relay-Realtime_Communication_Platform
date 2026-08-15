@@ -12,6 +12,7 @@ import { activeCalls } from "../helpers/active-calls";
 import { registerGroupCallEvents } from "./group-call.event";
 import { getGroupCallParticipants, getGroupCallsForUser, leaveGroupCall } from "../helpers/group-call-state";
 import { endGroupCall, getActiveGroupCallsForUser } from "../../services/group-call.service";
+import { clearActiveConversation } from "../helpers/active-conversations";
 
 export function handleConnection(io: Server, socket: Socket) {
   // console.log(`User ${socket.userId} connected`);
@@ -47,6 +48,9 @@ export function handleConnection(io: Server, socket: Socket) {
 
   //offline status as user disconnects
   socket.on("disconnect", async () => {
+
+    clearActiveConversation(socket.userId);
+
     const userActiveCalls =
       await getActiveGroupCallsForUser(
         socket.userId
