@@ -148,14 +148,28 @@ export async function notifyNewMessage(
         senderUsername: string;
         message: string;
         conversationId: string;
+        conversationType: "direct" | "group";
+        groupName?: string | null;
     }
 ) {
+    const isGroup =
+        data.conversationType === "group";
+
     return sendPushToUser(userId, {
         type: "new_message",
-        title: data.senderUsername,
-        body: data.message,
+
+        title: isGroup
+            ? data.groupName || "Group"
+            : data.senderUsername,
+
+        body: isGroup
+            ? `${data.senderUsername}: ${data.message}`
+            : data.message,
+
         url: `/chat/${data.conversationId}`,
-        conversationId: data.conversationId,
+
+        conversationId:
+            data.conversationId,
     });
 }
 
@@ -165,8 +179,34 @@ export async function notifyIncomingCall(
         callerUsername: string;
         conversationId: string;
         callType: "voice" | "video";
+        isGroupCall?: boolean;
+        groupName?: string | null;
     }
 ) {
+    const callLabel =
+        data.callType === "video"
+            ? "video call"
+            : "voice call";
+
+    if (data.isGroupCall) {
+        return sendPushToUser(userId, {
+            type: "incoming_group_call",
+
+            title:
+                data.groupName ||
+                "Group call",
+
+            body:
+                `${data.callerUsername} invited you to a ${callLabel}`,
+
+            url:
+                `/chat/${data.conversationId}`,
+
+            conversationId:
+                data.conversationId,
+        });
+    }
+
     return sendPushToUser(userId, {
         type: "incoming_call",
 
@@ -175,10 +215,13 @@ export async function notifyIncomingCall(
                 ? "Incoming video call"
                 : "Incoming voice call",
 
-        body: `${data.callerUsername} is calling you`,
+        body:
+            `${data.callerUsername} is calling you`,
 
-        url: `/chat/${data.conversationId}`,
+        url:
+            `/chat/${data.conversationId}`,
 
-        conversationId: data.conversationId,
+        conversationId:
+            data.conversationId,
     });
 }

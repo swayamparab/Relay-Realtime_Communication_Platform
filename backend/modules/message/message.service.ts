@@ -200,6 +200,7 @@ export async function sendMessage(userId: string, data: CreateMessageInput) {
                 conversation: {
                     columns: {
                         type: true,
+                        groupName: true
                     },
                 },
 
@@ -275,6 +276,12 @@ export async function sendMessage(userId: string, data: CreateMessageInput) {
 
                     conversationId:
                         data.conversationId,
+
+                    conversationType:
+                        message.conversation.type,
+
+                    groupName:
+                        message.conversation.groupName,
                 }
             );
         }

@@ -261,7 +261,7 @@ export function useCallEvents() {
         );
 
         socket.on(
-            "call_participant_invited",
+            "",
             handleCallParticipantInvited
         );
 
@@ -298,7 +298,7 @@ export function useCallEvents() {
             );
 
             socket.off(
-                "call_participant_invited",
+                "",
                 handleCallParticipantInvited
             );
 

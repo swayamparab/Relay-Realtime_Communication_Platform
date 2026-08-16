@@ -28,10 +28,11 @@ import {
 
 import { db } from "../../db";
 import { eq } from "drizzle-orm";
-import { users } from "../../db/schema";
+import { conversations, users } from "../../db/schema";
 
 import { activeCalls } from "../helpers/active-calls";
-import { getSocketId } from "../helpers/online-users";
+import { getSocketId, isUserOnline } from "../helpers/online-users";
+import { notifyIncomingCall } from "../../modules/push-notifications/push-notifications.service";
 
 type CallType = "voice" | "video";
 
@@ -47,6 +48,23 @@ async function getUsername(userId: string) {
     });
 
     return user?.username ?? "Unknown";
+}
+
+async function getGroupName(
+    conversationId: string
+) {
+    const conversation =
+        await db.query.conversations.findFirst({
+            where: eq(
+                conversations.id,
+                conversationId
+            ),
+            columns: {
+                groupName: true,
+            },
+        });
+
+    return conversation?.groupName ?? "Group call";
 }
 
 async function getParticipantsWithUsernames(
@@ -295,6 +313,19 @@ export function registerGroupCallEvents(
                     }
                 );
 
+                if (!isUserOnline(userId)) {
+                    await notifyIncomingCall(
+                        userId,
+                        {
+                            callerUsername,
+                            conversationId,
+                            callType: groupCall.type,
+                            isGroupCall: true,
+                            groupName:
+                                await getGroupName(conversationId),
+                        }
+                    );
+                }
                 callback?.({
                     success: true,
                     type: groupCall.type,
@@ -486,6 +517,20 @@ export function registerGroupCallEvents(
                     }
                 );
 
+                if (!isUserOnline(userId)) {
+                    await notifyIncomingCall(
+                        userId,
+                        {
+                            callerUsername,
+                            conversationId,
+                            callType: activeCall.type,
+                            isGroupCall: true,
+                            groupName:
+                                await getGroupName(conversationId),
+                        }
+                    );
+                }
+
                 callback?.({
                     success: true,
                 });
@@ -596,6 +641,33 @@ export function registerGroupCallEvents(
                             type,
                         }
                     );
+
+                const participantIds =
+                    await getConversationParticipantIds(
+                        conversationId
+                    );
+
+                const groupName =
+                    await getGroupName(conversationId);
+
+                for (const participantId of participantIds) {
+                    if (participantId === socket.userId) {
+                        continue;
+                    }
+
+                    if (!isUserOnline(participantId)) {
+                        await notifyIncomingCall(
+                            participantId,
+                            {
+                                callerUsername,
+                                conversationId,
+                                callType: type,
+                                isGroupCall: true,
+                                groupName,
+                            }
+                        );
+                    }
+                }
 
                 const participants =
                     await getParticipantsWithUsernames(

@@ -7,3 +7,7 @@ export function getOnlineUserIds() {
 export function getSocketId(userId: string) {
     return onlineUsers.get(userId);
 }
+
+export function isUserOnline(userId: string) {
+    return onlineUsers.has(userId);
+}

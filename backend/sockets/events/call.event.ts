@@ -3,6 +3,7 @@ import { isParticipant, getConversationParticipantIds } from "../../modules/conv
 import { findUserForCall } from "../../services/user.service";
 import { activeCalls } from "../helpers/active-calls";
 import { notifyIncomingCall } from "../../modules/push-notifications/push-notifications.service";
+import { isUserOnline } from "../helpers/online-users";
 
 export function registerCallEvents(io: Server, socket: Socket) {
     socket.on("call_user", async ({ conversationId, type, receiver }, callback) => {
@@ -39,14 +40,20 @@ export function registerCallEvents(io: Server, socket: Socket) {
                 receiver
             })
 
-            await notifyIncomingCall(
-                receiver.id,
-                {
-                    callerUsername: caller.username,
-                    conversationId,
-                    callType: type,
-                }
-            );
+
+            if (!isUserOnline(receiver.id)) {
+                await notifyIncomingCall(
+                    receiver.id,
+                    {
+                        callerUsername:
+                            caller.username,
+
+                        conversationId,
+
+                        callType: type,
+                    }
+                );
+            }
 
             callback?.({
                 success: true
