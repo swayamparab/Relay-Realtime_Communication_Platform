@@ -9,7 +9,6 @@ import ConversationList from "./Either/ConversationList";
 import RequestsPanel from "./RequestsPanel/RequestsPanel";
 import PendingRequestsButton from "./RequestsPanel/PendingRequestsButton";
 import { useChatRequests } from "@/hooks/useChatRequests";
-import OngoingCallCard from "@/components/call/OngoingCallCard";
 
 export default function Sidebar() {
     const [query, setQuery] = useState("");
@@ -18,7 +17,7 @@ export default function Sidebar() {
     const { data: requests } = useChatRequests();
 
     return (
-        <aside className="flex h-full min-h-0 flex-col overflow-hidden bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950">
+        <aside className="flex h-full min-h-0 flex-col overflow-hidden bg-slate-950">
             <SidebarHeader />
 
             <div className="min-h-0 flex-1 overflow-y-auto px-1 pb-2 sidebar-scroll">
@@ -37,8 +36,6 @@ export default function Sidebar() {
                             value={query}
                             onValueChange={setQuery}
                         />
-
-                        {/* <OngoingCallCard /> */}
 
                         {query.trim() ? (
                             <SearchResults query={query} />

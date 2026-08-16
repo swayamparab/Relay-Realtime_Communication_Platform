@@ -18,7 +18,7 @@ import { useCurrentUser } from "@/hooks/user/useCurrentUser";
 import { api } from "@/lib/api";
 
 import CreateGroupDialog from "../group/CreateGroupDialog";
-import SettingsDialog from "@/components/user/SettingsDialog";
+import ProfileDialog from "@/components/user/ProfileDialog";
 
 import {
     LogOut,
@@ -56,25 +56,9 @@ export default function SidebarHeader() {
 
     return (
         <>
-            <header className="flex items-center justify-between border-b border-slate-800 bg-slate-900/95 px-5 py-4 backdrop-blur">
-                <div className="flex min-w-0 items-center gap-3">
-                    <Avatar className="h-12 w-12 ring-2 ring-slate-700/70 shadow-md">
-                        <AvatarFallback className="bg-gradient-to-br from-sky-500 via-blue-600 to-indigo-700 font-semibold text-white">
-                            {data.user.username
-                                .charAt(0)
-                                .toUpperCase()}
-                        </AvatarFallback>
-                    </Avatar>
-
-                    <div className="min-w-0">
-                        <p className="truncate text-[15px] font-semibold text-white">
-                            {data.user.username}
-                        </p>
-
-                        <p className="truncate text-sm text-slate-400">
-                            {data.user.email}
-                        </p>
-                    </div>
+            <header className="flex h-16 shrink-0 items-center justify-between bg-slate-950 px-5">
+                <div className="text-3xl font-bold tracking-tight text-white">
+                    Relay
                 </div>
 
                 <div className="flex items-center gap-1">
@@ -84,7 +68,7 @@ export default function SidebarHeader() {
                         onClick={() =>
                             setCreateGroupOpen(true)
                         }
-                        className="text-slate-400 hover:bg-slate-800 hover:text-white"
+                        className="h-10 w-10 text-slate-400 hover:bg-slate-800 hover:text-white"
                         aria-label="Create Group"
                     >
                         <UsersRound className="h-5 w-5" />
@@ -94,8 +78,8 @@ export default function SidebarHeader() {
                         <DropdownMenuTrigger
                             className="
                                 inline-flex
-                                h-9
-                                w-9
+                                h-10
+                                w-10
                                 items-center
                                 justify-center
                                 rounded-md
@@ -114,11 +98,13 @@ export default function SidebarHeader() {
                             className="w-44 border-slate-800 bg-slate-900"
                         >
                             <DropdownMenuItem
-                                onClick={() => setSettingsOpen(true)}
+                                onClick={() =>
+                                    setSettingsOpen(true)
+                                }
                                 className="cursor-pointer text-white focus:bg-slate-800 focus:text-white"
                             >
                                 <Settings className="mr-2 h-4 w-4" />
-                                Settings
+                                Profile
                             </DropdownMenuItem>
 
                             <DropdownMenuItem
@@ -138,7 +124,7 @@ export default function SidebarHeader() {
                 onOpenChange={setCreateGroupOpen}
             />
 
-            <SettingsDialog
+            <ProfileDialog
                 open={settingsOpen}
                 onOpenChange={setSettingsOpen}
             />
