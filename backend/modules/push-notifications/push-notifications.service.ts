@@ -158,3 +158,27 @@ export async function notifyNewMessage(
         conversationId: data.conversationId,
     });
 }
+
+export async function notifyIncomingCall(
+    userId: string,
+    data: {
+        callerUsername: string;
+        conversationId: string;
+        callType: "voice" | "video";
+    }
+) {
+    return sendPushToUser(userId, {
+        type: "incoming_call",
+
+        title:
+            data.callType === "video"
+                ? "Incoming video call"
+                : "Incoming voice call",
+
+        body: `${data.callerUsername} is calling you`,
+
+        url: `/chat/${data.conversationId}`,
+
+        conversationId: data.conversationId,
+    });
+}
