@@ -236,8 +236,8 @@ export async function sendMessage(userId: string, data: CreateMessageInput) {
         return message;
     });
 
-    const otherParticipant =
-        await db.query.conversationParticipants.findFirst({
+    const otherParticipants =
+        await db.query.conversationParticipants.findMany({
             where: and(
                 eq(
                     conversationParticipants.conversationId,
@@ -253,16 +253,16 @@ export async function sendMessage(userId: string, data: CreateMessageInput) {
             },
         });
 
-    if (otherParticipant) {
+    for (const participant of otherParticipants) {
         const isViewing =
             isUserViewingConversation(
-                otherParticipant.userId,
+                participant.userId,
                 data.conversationId
             );
 
         if (!isViewing) {
             await notifyNewMessage(
-                otherParticipant.userId,
+                participant.userId,
                 {
                     senderUsername:
                         message.sender.username,
