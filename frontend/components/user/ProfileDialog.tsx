@@ -133,11 +133,11 @@ export default function ProfileDialog({
             >
                 <DialogHeader className="space-y-1">
                     <DialogTitle className="text-2xl font-semibold tracking-tight text-white">
-                        Settings
+                        Profile Settings
                     </DialogTitle>
 
                     <p className="text-sm text-slate-400">
-                        Manage your Relay account and security.
+                        Manage your Relay account.
                     </p>
 
                     {/* Account */}

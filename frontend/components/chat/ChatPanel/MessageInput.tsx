@@ -582,6 +582,7 @@ export default function MessageInput({
                 )}
                 <Button
                     size="icon"
+                    onPointerDown={(e) => e.preventDefault()}
                     onClick={handleSend}
                     disabled={!content.trim() || isRecording}
                     className="
