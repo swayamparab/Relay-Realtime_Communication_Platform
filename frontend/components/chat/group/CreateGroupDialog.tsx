@@ -11,7 +11,12 @@ import {
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
-import { X } from "lucide-react";
+import {
+    Check,
+    Search,
+    UsersRound,
+    X,
+} from "lucide-react";
 
 import { useSearchUsers } from "@/hooks/user/useSearchUsers";
 import { useGroupActions } from "@/hooks/group/useGroupActions";
@@ -26,9 +31,7 @@ export default function CreateGroupDialog({
     onOpenChange,
 }: CreateGroupDialogProps) {
     const [groupName, setGroupName] = useState("");
-
     const [search, setSearch] = useState("");
-
     const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
 
     const { data: users } = useSearchUsers(search);
@@ -46,6 +49,30 @@ export default function CreateGroupDialog({
         }
     }, [open]);
 
+    const selectedUserObjects =
+        users?.users.filter((user) =>
+            selectedUsers.includes(user.id)
+        ) ?? [];
+
+    function toggleUser(userId: string) {
+        setSelectedUsers((prev) =>
+            prev.includes(userId)
+                ? prev.filter((id) => id !== userId)
+                : [...prev, userId]
+        );
+    }
+
+    function removeUser(userId: string) {
+        setSelectedUsers((prev) =>
+            prev.filter((id) => id !== userId)
+        );
+    }
+
+    const canCreate =
+        groupName.trim().length > 0 &&
+        selectedUsers.length > 0 &&
+        !isCreatingGroup;
+
     return (
         <Dialog
             open={open}
@@ -54,214 +81,384 @@ export default function CreateGroupDialog({
             <DialogContent
                 className="
                     flex
-                    h-[80vh]
-                    max-h-[80vh]
+                    h-[85vh]
+                    max-h-[720px]
+                    w-[calc(100%-24px)]
+                    max-w-md
                     flex-col
                     overflow-hidden
                     border-slate-800
-                    bg-slate-900
+                    bg-slate-950
                     p-0
                     text-white
-                    sm:max-w-md
+                    shadow-2xl
                 "
             >
-                <DialogHeader className="border-b border-slate-800 px-6 py-5">
-                    <button
-                        type="button"
-                        onClick={() => onOpenChange(false)}
-                        className="
-                            absolute
-                            left-4
-                            top-4
-                            rounded-full
-                            p-2
-                            text-slate-400
-                            transition
-                            hover:bg-slate-800
-                            hover:text-white
-                        "
-                    >
-                        <X className="h-5 w-5" />
-                    </button>
-                    <div className="flex flex-col items-center gap-3">
-                        <Avatar className="h-16 w-16 ring-2 ring-slate-700">
-                            <AvatarFallback className="bg-gradient-to-br from-sky-500 via-blue-600 to-indigo-700 text-xl font-bold">
-                                {groupName
-                                    ? groupName.charAt(0).toUpperCase()
-                                    : "👥"}
+                {/* Header */}
+                <DialogHeader
+                    className="
+                        shrink-0
+                        border-b
+                        border-slate-800/80
+                        bg-slate-900/70
+                        px-5
+                        py-5
+                        backdrop-blur-xl
+                    "
+                >
+                    <div className="flex items-center gap-4">
+                        <Avatar
+                            className="
+                                h-14
+                                w-14
+                                shrink-0
+                                ring-2
+                                ring-slate-700/60
+                            "
+                        >
+                            <AvatarFallback
+                                className="
+                                    bg-gradient-to-br
+                                    from-sky-500
+                                    via-blue-600
+                                    to-indigo-700
+                                    text-lg
+                                    font-bold
+                                    text-white
+                                "
+                            >
+                                {groupName.trim()
+                                    ? groupName
+                                        .trim()
+                                        .charAt(0)
+                                        .toUpperCase()
+                                    : (
+                                        <UsersRound className="h-6 w-6" />
+                                    )}
                             </AvatarFallback>
                         </Avatar>
 
-                        <DialogTitle className="text-xl">
-                            Create Group
-                        </DialogTitle>
+                        <div className="min-w-0 flex-1">
+                            <DialogTitle className="text-lg font-semibold">
+                                Create Group
+                            </DialogTitle>
 
+                            <p className="mt-0.5 text-sm text-slate-400">
+                                Add people to start a group chat
+                            </p>
+                        </div>
+
+                        <button
+                            type="button"
+                            onClick={() =>
+                                onOpenChange(false)
+                            }
+                            className="
+                                rounded-full
+                                p-2
+                                text-slate-400
+                                transition
+                                hover:bg-slate-800
+                                hover:text-white
+                            "
+                            aria-label="Close"
+                        >
+                            <X className="h-5 w-5" />
+                        </button>
+                    </div>
+
+                    {/* Group name */}
+                    <div className="mt-4">
                         <input
                             value={groupName}
                             onChange={(e) =>
                                 setGroupName(e.target.value)
                             }
                             placeholder="Group name"
+                            maxLength={50}
                             className="
+                                h-11
                                 w-full
                                 rounded-xl
                                 border
-                                border-slate-700
-                                bg-slate-800
+                                border-slate-700/80
+                                bg-slate-800/70
                                 px-4
-                                py-2
-                                text-center
+                                text-sm
+                                text-white
                                 outline-none
+                                transition
+                                placeholder:text-slate-500
                                 focus:border-sky-500
+                                focus:bg-slate-800
+                                focus:ring-1
+                                focus:ring-sky-500/30
                             "
                         />
                     </div>
                 </DialogHeader>
 
-                <div className="flex-1 overflow-y-auto px-5 py-4">
+                {/* Content */}
+                <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+                    {/* Selected members */}
+                    {selectedUsers.length > 0 && (
+                        <div className="mb-5">
+                            <div className="mb-2 flex items-center justify-between">
+                                <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                                    Selected
+                                </p>
 
-                    <h3 className="mb-2 text-sm font-semibold uppercase tracking-wider text-slate-400">
-                        Selected Members
-                    </h3>
+                                <span className="text-xs text-slate-500">
+                                    {selectedUsers.length}{" "}
+                                    {selectedUsers.length === 1
+                                        ? "member"
+                                        : "members"}
+                                </span>
+                            </div>
 
-                    {selectedUsers.length === 0 ? (
-                        <p className="mb-4 text-sm text-slate-500">
-                            No members selected.
-                        </p>
-                    ) : (
-                        <div className="mb-5 flex flex-wrap gap-2">
-                            {users?.users
-                                .filter((user) =>
-                                    selectedUsers.includes(user.id)
-                                )
-                                .map((user) => (
-                                    <div
-                                        key={user.id}
-                                        className="
-                                            flex
-                                            items-center
-                                            gap-2
-                                            rounded-full
-                                            bg-slate-800
-                                            px-3
-                                            py-1
-                                            text-sm
-                                        "
-                                    >
-                                        {user.username}
-
-                                        <button
-                                            onClick={() =>
-                                                setSelectedUsers((prev) =>
-                                                    prev.filter(
-                                                        (id) =>
-                                                            id !==
-                                                            user.id
-                                                    )
-                                                )
-                                            }
+                            <div className="flex flex-wrap gap-2">
+                                {selectedUserObjects.map(
+                                    (user) => (
+                                        <div
+                                            key={user.id}
+                                            className="
+                                                flex
+                                                items-center
+                                                gap-2
+                                                rounded-full
+                                                border
+                                                border-slate-700/70
+                                                bg-slate-800
+                                                py-1
+                                                pl-1
+                                                pr-2
+                                                text-sm
+                                                text-slate-200
+                                            "
                                         >
-                                            <X className="h-3 w-3" />
-                                        </button>
-                                    </div>
-                                ))}
+                                            <Avatar className="h-7 w-7">
+                                                <AvatarFallback
+                                                    className="
+                                                        bg-gradient-to-br
+                                                        from-sky-500
+                                                        to-indigo-600
+                                                        text-xs
+                                                        font-semibold
+                                                        text-white
+                                                    "
+                                                >
+                                                    {user.username
+                                                        .charAt(0)
+                                                        .toUpperCase()}
+                                                </AvatarFallback>
+                                            </Avatar>
+
+                                            <span className="max-w-[120px] truncate">
+                                                {user.username}
+                                            </span>
+
+                                            <button
+                                                type="button"
+                                                onClick={() =>
+                                                    removeUser(
+                                                        user.id
+                                                    )
+                                                }
+                                                className="
+                                                    rounded-full
+                                                    p-0.5
+                                                    text-slate-500
+                                                    transition
+                                                    hover:bg-slate-700
+                                                    hover:text-white
+                                                "
+                                                aria-label={`Remove ${user.username}`}
+                                            >
+                                                <X className="h-3.5 w-3.5" />
+                                            </button>
+                                        </div>
+                                    )
+                                )}
+                            </div>
                         </div>
                     )}
 
-                    <input
-                        value={search}
-                        onChange={(e) =>
-                            setSearch(e.target.value)
-                        }
-                        placeholder="Search users..."
-                        className="
-                            mb-4
-                            w-full
-                            rounded-xl
-                            border
-                            border-slate-700
-                            bg-slate-800
-                            px-4
-                            py-2
-                            outline-none
-                            focus:border-sky-500
-                        "
-                    />
+                    {/* Search */}
+                    <div className="mb-4">
+                        <div className="relative">
+                            <Search
+                                className="
+                                    absolute
+                                    left-3
+                                    top-1/2
+                                    h-4
+                                    w-4
+                                    -translate-y-1/2
+                                    text-slate-500
+                                "
+                            />
 
-                    <div className="space-y-2">
+                            <input
+                                value={search}
+                                onChange={(e) =>
+                                    setSearch(e.target.value)
+                                }
+                                placeholder="Search people..."
+                                className="
+                                    h-11
+                                    w-full
+                                    rounded-xl
+                                    border
+                                    border-slate-800
+                                    bg-slate-900
+                                    pl-10
+                                    pr-4
+                                    text-sm
+                                    text-white
+                                    outline-none
+                                    transition
+                                    placeholder:text-slate-500
+                                    focus:border-sky-500/70
+                                    focus:ring-1
+                                    focus:ring-sky-500/20
+                                "
+                            />
+                        </div>
+                    </div>
+
+                    {/* Section title */}
+                    <p className="mb-2 px-1 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                        {search.trim()
+                            ? "Search results"
+                            : "People"}
+                    </p>
+
+                    {/* Users */}
+                    <div className="space-y-1">
                         {users?.users.map((user) => {
                             const selected =
-                                selectedUsers.includes(user.id);
+                                selectedUsers.includes(
+                                    user.id
+                                );
 
                             return (
                                 <button
                                     key={user.id}
                                     type="button"
                                     onClick={() =>
-                                        setSelectedUsers((prev) =>
-                                            selected
-                                                ? prev.filter(
-                                                    (id) =>
-                                                        id !==
-                                                        user.id
-                                                )
-                                                : [
-                                                    ...prev,
-                                                    user.id,
-                                                ]
-                                        )
+                                        toggleUser(user.id)
                                     }
-                                    className="
+                                    className={`
                                         flex
                                         w-full
                                         items-center
                                         justify-between
                                         rounded-xl
                                         px-3
-                                        py-2
+                                        py-2.5
+                                        text-left
                                         transition
-                                        hover:bg-slate-800
-                                    "
+                                        ${selected
+                                            ? "bg-sky-500/10"
+                                            : "hover:bg-slate-900"
+                                        }
+                                    `}
                                 >
-                                    <div className="flex items-center gap-3">
-                                        <Avatar className="h-10 w-10">
-                                            <AvatarFallback>
+                                    <div className="flex min-w-0 items-center gap-3">
+                                        <Avatar className="h-10 w-10 shrink-0">
+                                            <AvatarFallback
+                                                className="
+                                                    bg-gradient-to-br
+                                                    from-slate-700
+                                                    to-slate-800
+                                                    font-semibold
+                                                    text-slate-200
+                                                "
+                                            >
                                                 {user.username
                                                     .charAt(0)
                                                     .toUpperCase()}
                                             </AvatarFallback>
                                         </Avatar>
 
-                                        <div className="text-left">
-                                            <p className="font-medium">
+                                        <div className="min-w-0">
+                                            <p className="truncate text-sm font-medium text-white">
                                                 {user.username}
                                             </p>
 
-                                            <p className="text-xs text-slate-400">
+                                            <p className="truncate text-xs text-slate-500">
                                                 {user.email}
                                             </p>
                                         </div>
                                     </div>
 
-                                    <input
-                                        type="checkbox"
-                                        checked={selected}
-                                        readOnly
-                                        className="accent-sky-500"
-                                    />
+                                    <div
+                                        className={`
+                                            flex
+                                            h-5
+                                            w-5
+                                            shrink-0
+                                            items-center
+                                            justify-center
+                                            rounded-full
+                                            border
+                                            transition
+                                            ${selected
+                                                ? "border-sky-500 bg-sky-500 text-white"
+                                                : "border-slate-600 bg-transparent"
+                                            }
+                                        `}
+                                    >
+                                        {selected && (
+                                            <Check className="h-3.5 w-3.5" />
+                                        )}
+                                    </div>
                                 </button>
                             );
                         })}
+
+                        {users?.users.length === 0 && (
+                            <div className="flex flex-col items-center justify-center py-12 text-center">
+                                <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-slate-900">
+                                    <Search className="h-5 w-5 text-slate-500" />
+                                </div>
+
+                                <p className="text-sm font-medium text-slate-300">
+                                    No users found
+                                </p>
+
+                                <p className="mt-1 text-xs text-slate-500">
+                                    Try searching for someone else.
+                                </p>
+                            </div>
+                        )}
+
+                        {!users && !search.trim() && (
+                            <div className="flex flex-col items-center justify-center py-10 text-center">
+                                <UsersRound className="mb-3 h-7 w-7 text-slate-600" />
+
+                                <p className="text-sm text-slate-500">
+                                    Search for people to add
+                                </p>
+                            </div>
+                        )}
                     </div>
                 </div>
 
-                <div className="border-t border-slate-800 p-5">
+                {/* Footer */}
+                <div
+                    className="
+                        shrink-0
+                        border-t
+                        border-slate-800/80
+                        bg-slate-900/70
+                        p-4
+                        backdrop-blur-xl
+                    "
+                >
                     <button
-                        disabled={
-                            !groupName.trim() ||
-                            selectedUsers.length === 0 ||
-                            isCreatingGroup
-                        }
+                        type="button"
+                        disabled={!canCreate}
                         onClick={() =>
                             createGroup(
                                 {
@@ -276,21 +473,36 @@ export default function CreateGroupDialog({
                             )
                         }
                         className="
+                            h-11
                             w-full
                             rounded-xl
-                            bg-sky-600
-                            py-3
-                            font-medium
+                            bg-gradient-to-r
+                            from-sky-500
+                            to-blue-600
+                            text-sm
+                            font-semibold
                             text-white
+                            shadow-lg
+                            shadow-blue-950/20
                             transition
-                            hover:bg-sky-700
+                            hover:from-sky-400
+                            hover:to-blue-500
+                            active:scale-[0.99]
                             disabled:cursor-not-allowed
-                            disabled:opacity-50
+                            disabled:bg-slate-800
+                            disabled:bg-none
+                            disabled:text-slate-500
+                            disabled:shadow-none
                         "
                     >
                         {isCreatingGroup
-                            ? "Creating..."
-                            : "Create Group"}
+                            ? "Creating group..."
+                            : selectedUsers.length > 0
+                                ? `Create Group · ${selectedUsers.length} ${selectedUsers.length === 1
+                                    ? "member"
+                                    : "members"
+                                }`
+                                : "Select members"}
                     </button>
                 </div>
             </DialogContent>

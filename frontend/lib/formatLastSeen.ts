@@ -4,29 +4,45 @@ export function formatLastSeen(lastSeen: string | null) {
     }
 
     const date = new Date(lastSeen);
-
     const now = new Date();
 
-    const diff = now.getTime() - date.getTime();
+    const isSameDay =
+        date.getDate() === now.getDate() &&
+        date.getMonth() === now.getMonth() &&
+        date.getFullYear() === now.getFullYear();
 
-    const minutes = Math.floor(diff / 60000);
-
-    if (minutes < 1) {
-        return "Last seen just now";
+    // Today → show time
+    if (isSameDay) {
+        return date.toLocaleTimeString("en-IN", {
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: false,
+        });
     }
 
-    if (minutes < 60) {
-        return `Last seen ${minutes} minute${minutes === 1 ? "" : "s"} ago`;
+    // Yesterday
+    const yesterday = new Date(now);
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    const isYesterday =
+        date.getDate() === yesterday.getDate() &&
+        date.getMonth() === yesterday.getMonth() &&
+        date.getFullYear() === yesterday.getFullYear();
+
+    if (isYesterday) {
+        return "Yesterday";
     }
 
-    const hours = Math.floor(minutes / 60);
+    // Same year → DD/MM
+    const day = String(date.getDate()).padStart(2, "0");
+    const month = String(date.getMonth() + 1).padStart(2, "0");
 
-    if (hours < 24) {
-        return `Last seen ${hours} hour${hours === 1 ? "" : "s"} ago`;
+    if (date.getFullYear() === now.getFullYear()) {
+        return `${day}/${month}`;
     }
 
-    return `Last seen ${date.toLocaleDateString()} at ${date.toLocaleTimeString([], {
-        hour: "numeric",
-        minute: "2-digit",
-    })}`;
+    // Previous years → DD/MM/YY
+    const year = String(date.getFullYear()).slice(-2);
+
+    return `${day}/${month}/${year}`;
 }

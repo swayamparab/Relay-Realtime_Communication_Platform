@@ -1,6 +1,10 @@
 "use client";
 
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import {
+    Avatar,
+    AvatarFallback,
+} from "@/components/ui/avatar";
+
 import { Badge } from "@/components/ui/badge";
 
 import { GroupMember } from "@/types/group";
@@ -12,14 +16,19 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-import { MoreVertical } from "lucide-react";
+import {
+    MoreVertical,
+    ShieldCheck,
+    UserMinus,
+    UserRoundCog,
+    Loader2,
+} from "lucide-react";
 
 import { useGroupActions } from "@/hooks/group/useGroupActions";
 
 type Props = {
     member: GroupMember;
     currentUserId: string;
-
     currentUserRole: "admin" | "member";
     groupOwnerId: string;
     groupId: string;
@@ -30,9 +39,8 @@ export default function GroupMemberItem({
     currentUserId,
     currentUserRole,
     groupOwnerId,
-    groupId
+    groupId,
 }: Props) {
-
     const {
         removeMember,
         promoteMember,
@@ -42,100 +50,286 @@ export default function GroupMemberItem({
         isDemotingAdmin,
     } = useGroupActions();
 
-    const isYou = member.id === currentUserId;
+    const isYou =
+        member.id === currentUserId;
 
-    const isOwner = member.id === groupOwnerId;
+    const isOwner =
+        member.id === groupOwnerId;
 
     const canManage =
         currentUserRole === "admin" &&
         !isYou &&
         !isOwner;
 
+    const isActionLoading =
+        isRemovingMember ||
+        isPromotingMember ||
+        isDemotingAdmin;
+
     return (
-        <div className="flex items-center justify-between rounded-xl px-2 py-2 hover:bg-slate-800/60">
-            <div className="flex items-center gap-3">
-                <Avatar className="h-11 w-11">
-                    <AvatarFallback>
-                        {member.username.charAt(0).toUpperCase()}
+        <div
+            className="
+                group
+                flex
+                items-center
+                justify-between
+                rounded-xl
+                px-3
+                py-2.5
+                transition
+                hover:bg-slate-800/60
+            "
+        >
+            {/* =====================================================
+                USER
+            ====================================================== */}
+
+            <div className="flex min-w-0 items-center gap-3">
+                <Avatar
+                    className="
+                        h-11
+                        w-11
+                        shrink-0
+                        border
+                        border-slate-700
+                        bg-slate-800
+                    "
+                >
+                    <AvatarFallback
+                        className="
+                            bg-gradient-to-br
+                            from-slate-700
+                            to-slate-800
+                            text-sm
+                            font-semibold
+                            text-slate-200
+                        "
+                    >
+                        {member.username
+                            .charAt(0)
+                            .toUpperCase()}
                     </AvatarFallback>
                 </Avatar>
 
-                <div>
-                    <div className="flex items-center gap-2">
-                        <p className="font-medium text-white">
+                <div className="min-w-0">
+                    <div className="flex min-w-0 items-center gap-2">
+                        <p
+                            className="
+                                max-w-[180px]
+                                truncate
+                                text-sm
+                                font-medium
+                                text-white
+                            "
+                        >
                             {member.username}
                         </p>
 
                         {isYou && (
                             <Badge
                                 variant="secondary"
-                                className="rounded-full bg-slate-700 px-3"
+                                className="
+                                    shrink-0
+                                    rounded-full
+                                    border
+                                    border-slate-700
+                                    bg-slate-800
+                                    px-2
+                                    py-0.5
+                                    text-[10px]
+                                    font-medium
+                                    text-slate-300
+                                "
                             >
                                 You
                             </Badge>
                         )}
                     </div>
 
-                    <p className="text-xs text-slate-400">
+                    <p
+                        className="
+                            mt-0.5
+                            max-w-[220px]
+                            truncate
+                            text-xs
+                            text-slate-500
+                        "
+                    >
                         {member.email}
                     </p>
                 </div>
             </div>
 
-            <div className="flex items-center gap-2">
-                {member.role === "admin" && (
-                    <Badge className="bg-sky-600">
+            {/* =====================================================
+                ROLE + ACTIONS
+            ====================================================== */}
+
+            <div className="ml-3 flex shrink-0 items-center gap-1.5">
+                {isOwner ? (
+                    <Badge
+                        className="
+                            flex
+                            items-center
+                            gap-1
+                            rounded-full
+                            border
+                            border-amber-500/20
+                            bg-amber-500/10
+                            px-2.5
+                            py-1
+                            text-[10px]
+                            font-semibold
+                            text-amber-400
+                        "
+                    >
+                        <ShieldCheck className="h-3 w-3" />
+                        Owner
+                    </Badge>
+                ) : member.role === "admin" ? (
+                    <Badge
+                        className="
+                            flex
+                            items-center
+                            gap-1
+                            rounded-full
+                            border
+                            border-sky-500/20
+                            bg-sky-500/10
+                            px-2.5
+                            py-1
+                            text-[10px]
+                            font-semibold
+                            text-sky-400
+                        "
+                    >
+                        <ShieldCheck className="h-3 w-3" />
                         Admin
                     </Badge>
-                )}
+                ) : null}
+
+                {/* Manage member */}
 
                 {canManage && (
                     <DropdownMenu>
-                        <DropdownMenuTrigger className="rounded-lg p-1 hover:bg-slate-700">
-                            <MoreVertical className="h-4 w-4 text-slate-400" />
+                        <DropdownMenuTrigger
+                            disabled={isActionLoading}
+                            className="
+                                rounded-lg
+                                p-2
+                                text-slate-500
+                                outline-none
+                                transition
+                                hover:bg-slate-700/70
+                                hover:text-white
+                                focus:ring-2
+                                focus:ring-sky-500/30
+                                disabled:pointer-events-none
+                                disabled:opacity-40
+                            "
+                            aria-label={`Manage ${member.username}`}
+                        >
+                            {isActionLoading ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                                <MoreVertical className="h-4 w-4" />
+                            )}
                         </DropdownMenuTrigger>
 
                         <DropdownMenuContent
                             align="end"
-                            className="border-slate-700 bg-slate-900 text-white"
+                            sideOffset={6}
+                            className="
+                                w-48
+                                border
+                                border-slate-800
+                                bg-slate-950
+                                p-1
+                                text-white
+                                shadow-xl
+                            "
                         >
-                            {member.role === "member" ? (
+                            {member.role ===
+                                "member" ? (
                                 <DropdownMenuItem
+                                    disabled={
+                                        isPromotingMember
+                                    }
                                     onClick={() =>
                                         promoteMember({
                                             groupId,
-                                            memberId: member.id,
+                                            memberId:
+                                                member.id,
                                         })
                                     }
-                                    disabled={isPromotingMember}
+                                    className="
+                                        cursor-pointer
+                                        gap-2
+                                        rounded-lg
+                                        text-slate-300
+                                        focus:bg-slate-800
+                                        focus:text-white
+                                    "
                                 >
-                                    Promote to Admin
+                                    <UserRoundCog className="h-4 w-4 text-sky-400" />
+
+                                    <span>
+                                        Promote to Admin
+                                    </span>
                                 </DropdownMenuItem>
                             ) : (
                                 <DropdownMenuItem
+                                    disabled={
+                                        isDemotingAdmin
+                                    }
                                     onClick={() =>
                                         demoteAdmin({
                                             groupId,
-                                            memberId: member.id,
+                                            memberId:
+                                                member.id,
                                         })
                                     }
-                                    disabled={isDemotingAdmin}
+                                    className="
+                                        cursor-pointer
+                                        gap-2
+                                        rounded-lg
+                                        text-slate-300
+                                        focus:bg-slate-800
+                                        focus:text-white
+                                    "
                                 >
-                                    Demote Admin
+                                    <ShieldCheck className="h-4 w-4 text-sky-400" />
+
+                                    <span>
+                                        Demote Admin
+                                    </span>
                                 </DropdownMenuItem>
                             )}
 
                             <DropdownMenuItem
+                                disabled={
+                                    isRemovingMember
+                                }
                                 onClick={() =>
                                     removeMember({
                                         groupId,
-                                        memberId: member.id,
+                                        memberId:
+                                            member.id,
                                     })
                                 }
-                                disabled={isRemovingMember}
-                                className="text-red-400"
+                                className="
+                                    cursor-pointer
+                                    gap-2
+                                    rounded-lg
+                                    text-red-400
+                                    focus:bg-red-500/10
+                                    focus:text-red-300
+                                "
                             >
-                                Remove Member
+                                <UserMinus className="h-4 w-4" />
+
+                                <span>
+                                    Remove Member
+                                </span>
                             </DropdownMenuItem>
                         </DropdownMenuContent>
                     </DropdownMenu>

@@ -15,7 +15,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-import { Eye, EyeOff } from "lucide-react";
+import {
+    Eye,
+    EyeOff,
+    X,
+    User,
+    ShieldCheck,
+} from "lucide-react";
 
 import {
     updateProfileSchema,
@@ -88,8 +94,12 @@ export default function ProfileDialog({
             newPassword?: string;
         } = {};
 
-        if (values.username !== data.user.username) {
-            payload.username = values.username;
+        if (
+            values.username !==
+            data.user.username
+        ) {
+            payload.username =
+                values.username;
         }
 
         if (values.newPassword) {
@@ -126,46 +136,158 @@ export default function ProfileDialog({
                     border
                     border-slate-800
                     bg-slate-950
+                    p-0
                     text-white
                     shadow-2xl
                     sm:max-w-md
                 "
             >
-                <DialogHeader className="space-y-1">
-                    <DialogTitle className="text-2xl font-semibold tracking-tight text-white">
-                        Profile Settings
-                    </DialogTitle>
+                {/* =================================================
+                    CLOSE BUTTON
+                ================================================== */}
 
-                    <p className="text-sm text-slate-400">
-                        Manage your Relay account.
-                    </p>
+                <button
+                    type="button"
+                    onClick={() =>
+                        onOpenChange(false)
+                    }
+                    className="
+                        absolute
+                        right-4
+                        top-4
+                        z-20
+                        rounded-xl
+                        p-2
+                        text-slate-500
+                        transition
+                        hover:bg-slate-800
+                        hover:text-white
+                        focus:outline-none
+                        focus:ring-2
+                        focus:ring-slate-700
+                    "
+                    aria-label="Close profile settings"
+                >
+                    <X className="h-5 w-5" />
+                </button>
 
-                    {/* Account */}
-                    <div className="mt-4 rounded-xl border border-slate-800 bg-slate-900/70 px-4 py-3">
-                        <p className="text-xs font-medium uppercase tracking-wider text-slate-500">
-                            Account
+                {/* =================================================
+                    HEADER
+                ================================================== */}
+
+                <DialogHeader
+                    className="
+                        border-b
+                        border-slate-800
+                        px-6
+                        pb-5
+                        pt-6
+                    "
+                >
+                    <div className="pr-8">
+                        <DialogTitle
+                            className="
+                                text-xl
+                                font-semibold
+                                tracking-tight
+                                text-white
+                            "
+                        >
+                            Profile Settings
+                        </DialogTitle>
+
+                        <p className="mt-1 text-sm text-slate-500">
+                            Manage your Relay account
+                            and security settings.
                         </p>
+                    </div>
 
-                        <p className="mt-1 truncate text-sm font-medium text-slate-200">
-                            {data?.user.email}
-                        </p>
+                    {/* Account Card */}
+
+                    <div
+                        className="
+                            mt-5
+                            flex
+                            items-center
+                            gap-3
+                            rounded-xl
+                            border
+                            border-slate-800
+                            bg-slate-900/70
+                            p-3
+                        "
+                    >
+                        <div
+                            className="
+                                flex
+                                h-10
+                                w-10
+                                shrink-0
+                                items-center
+                                justify-center
+                                rounded-xl
+                                bg-slate-800
+                            "
+                        >
+                            <User className="h-4 w-4 text-slate-400" />
+                        </div>
+
+                        <div className="min-w-0">
+                            <p className="text-xs font-medium uppercase tracking-wider text-slate-500">
+                                Account
+                            </p>
+
+                            <p className="mt-0.5 truncate text-sm font-medium text-slate-200">
+                                {data?.user.email ??
+                                    "Loading..."}
+                            </p>
+                        </div>
                     </div>
                 </DialogHeader>
 
-                <form
-                    onSubmit={handleSubmit(onSubmit)}
-                    className="mt-2 space-y-7"
-                >
-                    {/* Profile */}
-                    <section className="space-y-3">
-                        <div>
-                            <h3 className="text-sm font-semibold text-white">
-                                Profile
-                            </h3>
+                {/* =================================================
+                    FORM
+                ================================================== */}
 
-                            <p className="mt-1 text-xs text-slate-500">
-                                This is how you'll appear to other users.
-                            </p>
+                <form
+                    onSubmit={handleSubmit(
+                        onSubmit
+                    )}
+                    className="px-6 py-5"
+                >
+                    {/* =================================================
+                        PROFILE
+                    ================================================== */}
+
+                    <section className="space-y-4">
+                        <div className="flex items-start gap-3">
+                            <div
+                                className="
+                                    mt-0.5
+                                    flex
+                                    h-8
+                                    w-8
+                                    shrink-0
+                                    items-center
+                                    justify-center
+                                    rounded-lg
+                                    bg-sky-500/10
+                                "
+                            >
+                                <User className="h-4 w-4 text-sky-400" />
+                            </div>
+
+                            <div>
+                                <h3 className="text-sm font-semibold text-white">
+                                    Profile
+                                </h3>
+
+                                <p className="mt-0.5 text-xs text-slate-500">
+                                    This is how you'll
+                                    appear to other
+                                    users.
+                                </p>
+                            </div>
                         </div>
 
                         <div className="space-y-2">
@@ -180,41 +302,82 @@ export default function ProfileDialog({
                                 id="username"
                                 placeholder="Username"
                                 autoComplete="username"
-                                aria-invalid={!!errors.username}
-                                {...register("username")}
+                                aria-invalid={
+                                    !!errors.username
+                                }
+                                {...register(
+                                    "username"
+                                )}
                                 className="
                                     h-11
                                     border-slate-800
                                     bg-slate-900
                                     text-white
                                     placeholder:text-slate-600
-                                    focus-visible:border-slate-600
-                                    focus-visible:ring-slate-700
+                                    focus-visible:border-sky-500
+                                    focus-visible:ring-1
+                                    focus-visible:ring-sky-500
                                 "
                             />
 
                             {errors.username && (
-                                <p className="text-sm text-red-400">
-                                    {errors.username.message}
+                                <p className="text-xs text-red-400">
+                                    {
+                                        errors
+                                            .username
+                                            .message
+                                    }
                                 </p>
                             )}
                         </div>
                     </section>
 
-                    {/* Security */}
-                    <section className="space-y-4 border-t border-slate-800 pt-6">
-                        <div>
-                            <h3 className="text-sm font-semibold text-white">
-                                Security
-                            </h3>
+                    {/* =================================================
+                        SECURITY
+                    ================================================== */}
 
-                            <p className="mt-1 text-xs text-slate-500">
-                                Change your password to keep your account secure.
-                            </p>
+                    <section
+                        className="
+                            mt-7
+                            space-y-4
+                            border-t
+                            border-slate-800
+                            pt-6
+                        "
+                    >
+                        <div className="flex items-start gap-3">
+                            <div
+                                className="
+                                    mt-0.5
+                                    flex
+                                    h-8
+                                    w-8
+                                    shrink-0
+                                    items-center
+                                    justify-center
+                                    rounded-lg
+                                    bg-emerald-500/10
+                                "
+                            >
+                                <ShieldCheck className="h-4 w-4 text-emerald-400" />
+                            </div>
+
+                            <div>
+                                <h3 className="text-sm font-semibold text-white">
+                                    Security
+                                </h3>
+
+                                <p className="mt-0.5 text-xs text-slate-500">
+                                    Change your password
+                                    to keep your account
+                                    secure.
+                                </p>
+                            </div>
                         </div>
 
                         <div className="space-y-4">
                             {/* Current Password */}
+
                             <div className="space-y-2">
                                 <Label
                                     htmlFor="currentPassword"
@@ -236,7 +399,9 @@ export default function ProfileDialog({
                                         aria-invalid={
                                             !!errors.currentPassword
                                         }
-                                        {...register("currentPassword")}
+                                        {...register(
+                                            "currentPassword"
+                                        )}
                                         className="
                                             h-11
                                             border-slate-800
@@ -244,8 +409,9 @@ export default function ProfileDialog({
                                             pr-11
                                             text-white
                                             placeholder:text-slate-600
-                                            focus-visible:border-slate-600
-                                            focus-visible:ring-slate-700
+                                            focus-visible:border-sky-500
+                                            focus-visible:ring-1
+                                            focus-visible:ring-sky-500
                                         "
                                     />
 
@@ -253,7 +419,8 @@ export default function ProfileDialog({
                                         type="button"
                                         onClick={() =>
                                             setShowCurrentPassword(
-                                                !showCurrentPassword
+                                                (prev) =>
+                                                    !prev
                                             )
                                         }
                                         className="
@@ -261,8 +428,10 @@ export default function ProfileDialog({
                                             right-3
                                             top-1/2
                                             -translate-y-1/2
+                                            rounded-md
+                                            p-1
                                             text-slate-500
-                                            transition-colors
+                                            transition
                                             hover:text-slate-200
                                         "
                                         aria-label={
@@ -280,13 +449,18 @@ export default function ProfileDialog({
                                 </div>
 
                                 {errors.currentPassword && (
-                                    <p className="text-sm text-red-400">
-                                        {errors.currentPassword.message}
+                                    <p className="text-xs text-red-400">
+                                        {
+                                            errors
+                                                .currentPassword
+                                                .message
+                                        }
                                     </p>
                                 )}
                             </div>
 
                             {/* New Password */}
+
                             <div className="space-y-2">
                                 <Label
                                     htmlFor="newPassword"
@@ -308,7 +482,9 @@ export default function ProfileDialog({
                                         aria-invalid={
                                             !!errors.newPassword
                                         }
-                                        {...register("newPassword")}
+                                        {...register(
+                                            "newPassword"
+                                        )}
                                         className="
                                             h-11
                                             border-slate-800
@@ -316,8 +492,9 @@ export default function ProfileDialog({
                                             pr-11
                                             text-white
                                             placeholder:text-slate-600
-                                            focus-visible:border-slate-600
-                                            focus-visible:ring-slate-700
+                                            focus-visible:border-sky-500
+                                            focus-visible:ring-1
+                                            focus-visible:ring-sky-500
                                         "
                                     />
 
@@ -325,7 +502,8 @@ export default function ProfileDialog({
                                         type="button"
                                         onClick={() =>
                                             setShowNewPassword(
-                                                !showNewPassword
+                                                (prev) =>
+                                                    !prev
                                             )
                                         }
                                         className="
@@ -333,8 +511,10 @@ export default function ProfileDialog({
                                             right-3
                                             top-1/2
                                             -translate-y-1/2
+                                            rounded-md
+                                            p-1
                                             text-slate-500
-                                            transition-colors
+                                            transition
                                             hover:text-slate-200
                                         "
                                         aria-label={
@@ -352,13 +532,18 @@ export default function ProfileDialog({
                                 </div>
 
                                 {errors.newPassword && (
-                                    <p className="text-sm text-red-400">
-                                        {errors.newPassword.message}
+                                    <p className="text-xs text-red-400">
+                                        {
+                                            errors
+                                                .newPassword
+                                                .message
+                                        }
                                     </p>
                                 )}
                             </div>
 
                             {/* Confirm Password */}
+
                             <div className="space-y-2">
                                 <Label
                                     htmlFor="confirmPassword"
@@ -380,7 +565,9 @@ export default function ProfileDialog({
                                         aria-invalid={
                                             !!errors.confirmPassword
                                         }
-                                        {...register("confirmPassword")}
+                                        {...register(
+                                            "confirmPassword"
+                                        )}
                                         className="
                                             h-11
                                             border-slate-800
@@ -388,8 +575,9 @@ export default function ProfileDialog({
                                             pr-11
                                             text-white
                                             placeholder:text-slate-600
-                                            focus-visible:border-slate-600
-                                            focus-visible:ring-slate-700
+                                            focus-visible:border-sky-500
+                                            focus-visible:ring-1
+                                            focus-visible:ring-sky-500
                                         "
                                     />
 
@@ -397,7 +585,8 @@ export default function ProfileDialog({
                                         type="button"
                                         onClick={() =>
                                             setShowConfirmPassword(
-                                                !showConfirmPassword
+                                                (prev) =>
+                                                    !prev
                                             )
                                         }
                                         className="
@@ -405,8 +594,10 @@ export default function ProfileDialog({
                                             right-3
                                             top-1/2
                                             -translate-y-1/2
+                                            rounded-md
+                                            p-1
                                             text-slate-500
-                                            transition-colors
+                                            transition
                                             hover:text-slate-200
                                         "
                                         aria-label={
@@ -424,34 +615,60 @@ export default function ProfileDialog({
                                 </div>
 
                                 {errors.confirmPassword && (
-                                    <p className="text-sm text-red-400">
-                                        {errors.confirmPassword.message}
+                                    <p className="text-xs text-red-400">
+                                        {
+                                            errors
+                                                .confirmPassword
+                                                .message
+                                        }
                                     </p>
                                 )}
                             </div>
                         </div>
                     </section>
 
-                    {/* Save */}
-                    <Button
-                        type="submit"
+                    {/* =================================================
+                        SAVE
+                    ================================================== */}
+
+                    <div
                         className="
-                            h-11
-                            w-full
-                            bg-white
-                            font-semibold
-                            text-slate-950
-                            transition
-                            hover:bg-slate-200
+                            mt-7
+                            border-t
+                            border-slate-800
+                            pt-5
                         "
-                        disabled={
-                            isUpdatingProfile || !isDirty
-                        }
                     >
-                        {isUpdatingProfile
-                            ? "Saving..."
-                            : "Save Changes"}
-                    </Button>
+                        <Button
+                            type="submit"
+                            className="
+                                h-11
+                                w-full
+                                rounded-xl
+                                bg-white
+                                font-semibold
+                                text-slate-950
+                                shadow-lg
+                                transition
+                                hover:bg-slate-200
+                                disabled:cursor-not-allowed
+                                disabled:opacity-50
+                            "
+                            disabled={
+                                isUpdatingProfile ||
+                                !isDirty
+                            }
+                        >
+                            {isUpdatingProfile
+                                ? "Saving..."
+                                : "Save Changes"}
+                        </Button>
+
+                        <p className="mt-2 text-center text-[11px] text-slate-600">
+                            Changes are applied
+                            immediately.
+                        </p>
+                    </div>
                 </form>
             </DialogContent>
         </Dialog>

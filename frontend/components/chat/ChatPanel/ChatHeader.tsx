@@ -56,8 +56,7 @@ export default function ChatHeader({ isTyping, onJumpToMessage }: ChatHeaderProp
     }, [debouncedSearch]);
 
     const {
-        data: searchResults,
-        isFetching,
+        data: searchResults
     } = useSearchMessages(conversationId, debouncedSearch);
 
     const totalMatches = searchResults?.messages.length ?? 0;
@@ -107,15 +106,15 @@ export default function ChatHeader({ isTyping, onJumpToMessage }: ChatHeaderProp
         return (
             <header
                 className="
-                flex
-                h-16
-                items-center
-                justify-between
-                border-slate-800/70
-                bg-slate-900/80
-                px-5
-                backdrop-blur-xl
-            "
+                    flex
+                    h-16
+                    items-center
+                    justify-between
+                    border-slate-800/70
+                    bg-slate-900/80
+                    px-5
+                    backdrop-blur-xl
+                "
             >
                 <p className="text-slate-400">
                     Loading...
@@ -128,15 +127,15 @@ export default function ChatHeader({ isTyping, onJumpToMessage }: ChatHeaderProp
         return (
             <header
                 className="
-                flex
-                h-16
-                items-center
-                justify-between
-                border-slate-800/70
-                bg-slate-900/80
-                px-5
-                backdrop-blur-xl
-            "
+                    flex
+                    h-16
+                    items-center
+                    justify-between
+                    border-slate-800/70
+                    bg-slate-900/80
+                    px-5
+                    backdrop-blur-xl
+                "
             >
                 <p className="text-red-400">
                     Conversation not found
@@ -305,25 +304,25 @@ export default function ChatHeader({ isTyping, onJumpToMessage }: ChatHeaderProp
                         }
                     }}
                     className="
-            flex
-            min-w-0
-            items-center
-            gap-3
-            rounded-xl
-            px-2
-            py-1
-            transition
-            hover:bg-slate-800/60
-        "
+                        flex
+                        min-w-0
+                        items-center
+                        gap-3
+                        rounded-xl
+                        px-2
+                        py-1
+                        transition
+                        hover:bg-slate-800/60
+                    "
                 >
                     <Avatar
                         className="
-                h-12
-                w-12
-                ring-2
-                ring-slate-700/40
-                shadow-lg
-            "
+                            h-12
+                            w-12
+                            ring-2
+                            ring-slate-700/40
+                            shadow-lg
+                        "
                     >
                         <AvatarFallback className="bg-gradient-to-br from-sky-500 via-blue-600 to-indigo-700">
                             {avatarLetter}
@@ -341,30 +340,30 @@ export default function ChatHeader({ isTyping, onJumpToMessage }: ChatHeaderProp
                                     {isOnline && (
                                         <span
                                             className="
-                                    absolute
-                                    inset-0
-                                    animate-ping
-                                    rounded-full
-                                    bg-emerald-500
-                                    opacity-60
-                                "
+                                                absolute
+                                                inset-0
+                                                animate-ping
+                                                rounded-full
+                                                bg-emerald-500
+                                                opacity-60
+                                            "
                                         />
                                     )}
 
                                     <span
                                         className={`
-                                relative
-                                block
-                                h-2.5
-                                w-2.5
-                                rounded-full
-                                ${isTyping
+                                            relative
+                                            block
+                                            h-2.5
+                                            w-2.5
+                                            rounded-full
+                                            ${isTyping
                                                 ? "bg-emerald-400"
                                                 : isOnline
                                                     ? "bg-emerald-500"
                                                     : "bg-slate-500"
                                             }
-                            `}
+                                        `}
                                     />
                                 </div>
                             )}

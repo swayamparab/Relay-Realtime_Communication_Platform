@@ -7,16 +7,32 @@ import {
     DialogTitle,
 } from "@/components/ui/dialog";
 
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Pencil, Check, X } from "lucide-react";
+import {
+    Avatar,
+    AvatarFallback,
+} from "@/components/ui/avatar";
+
+import {
+    Pencil,
+    Check,
+    X,
+    Search,
+    UserPlus,
+    Loader2,
+    Users,
+    LogOut,
+    Trash2,
+} from "lucide-react";
+
+import { useEffect, useState } from "react";
 
 import { useGroupInfo } from "@/hooks/group/useGroupInfo";
 import { useCurrentUser } from "@/hooks/user/useCurrentUser";
-
-import GroupMemberItem from "./GroupMemberItem";
-import { useEffect, useState } from "react";
 import { useGroupActions } from "@/hooks/group/useGroupActions";
 import { useSearchUsers } from "@/hooks/user/useSearchUsers";
+
+import GroupMemberItem from "./GroupMemberItem";
+
 import { toast } from "sonner";
 
 type GroupInfoDialogProps = {
@@ -30,16 +46,14 @@ export default function GroupInfoDialog({
     onOpenChange,
     groupId,
 }: GroupInfoDialogProps) {
-
     const {
         data,
         isLoading,
     } = useGroupInfo(groupId);
 
-    const { data: currentUser } = useCurrentUser();
-
-    const [confirmLeave, setConfirmLeave] = useState(false);
-    const [confirmDelete, setConfirmDelete] = useState(false);
+    const {
+        data: currentUser,
+    } = useCurrentUser();
 
     const {
         leaveGroup,
@@ -55,70 +69,244 @@ export default function GroupInfoDialog({
         isAddingMembers,
     } = useGroupActions();
 
-    const [editingName, setEditingName] = useState(false);
+    const [editingName, setEditingName] =
+        useState(false);
 
-    const [groupName, setGroupName] = useState("");
+    const [groupName, setGroupName] =
+        useState("");
 
-    const [addingMembers, setAddingMembers] = useState(false);
+    const [addingMembers, setAddingMembers] =
+        useState(false);
 
-    const [search, setSearch] = useState("");
+    const [search, setSearch] =
+        useState("");
 
-    const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
+    const [selectedMembers, setSelectedMembers] =
+        useState<string[]>([]);
 
-    const { data: users } = useSearchUsers(search);
+    const [confirmLeave, setConfirmLeave] =
+        useState(false);
 
+    const [confirmDelete, setConfirmDelete] =
+        useState(false);
+
+    const {
+        data: users,
+        isLoading: isSearchingUsers,
+    } = useSearchUsers(search);
+
+    /*
+     * Keep local group name synchronized
+     * with server data.
+     */
     useEffect(() => {
-        if (data) {
+        if (data?.group) {
             setGroupName(data.group.name);
         }
     }, [data]);
 
+    /*
+     * Reset temporary UI state whenever
+     * the dialog is closed.
+     */
+    useEffect(() => {
+        if (!open) {
+            setEditingName(false);
+            setAddingMembers(false);
+            setSearch("");
+            setSelectedMembers([]);
+            setConfirmLeave(false);
+            setConfirmDelete(false);
+        }
+    }, [open]);
+
+    /*
+     * Loading
+     */
     if (isLoading) {
         return (
-            <Dialog open={open} onOpenChange={onOpenChange}>
-                <DialogContent className="border-slate-800 bg-slate-900 text-white sm:max-w-md">
-                    <p className="py-10 text-center text-slate-400">
-                        Loading...
-                    </p>
+            <Dialog
+                open={open}
+                onOpenChange={onOpenChange}
+            >
+                <DialogContent
+                    className="
+                        border-slate-800
+                        bg-slate-950
+                        text-white
+                        sm:max-w-md
+                    "
+                >
+                    <div className="flex h-40 items-center justify-center">
+                        <div className="flex items-center gap-2 text-sm text-slate-400">
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            Loading group...
+                        </div>
+                    </div>
                 </DialogContent>
             </Dialog>
         );
     }
 
+    /*
+     * Data unavailable
+     */
     if (!data || !currentUser) {
         return (
-            <Dialog open={open} onOpenChange={onOpenChange}>
-                <DialogContent className="border-slate-800 bg-slate-900 text-white sm:max-w-md">
-                    <p className="py-10 text-center text-red-400">
-                        Failed to load group.
-                    </p>
+            <Dialog
+                open={open}
+                onOpenChange={onOpenChange}
+            >
+                <DialogContent
+                    className="
+                        border-slate-800
+                        bg-slate-950
+                        text-white
+                        sm:max-w-md
+                    "
+                >
+                    <div className="flex h-40 items-center justify-center">
+                        <p className="text-sm text-red-400">
+                            Failed to load group.
+                        </p>
+                    </div>
                 </DialogContent>
             </Dialog>
         );
     }
 
-    const members = [...data.group.members].sort((a, b) => {
-        const aYou = a.id === currentUser.user.id;
-        const bYou = b.id === currentUser.user.id;
+    /*
+     * From here onward TypeScript knows
+     * that group and currentUser exist.
+     */
+    const group = data.group;
+
+    /*
+     * Put current user first,
+     * then admins,
+     * then normal members.
+     */
+    const members = [
+        ...group.members,
+    ].sort((a, b) => {
+        const aYou =
+            a.id === currentUser.user.id;
+
+        const bYou =
+            b.id === currentUser.user.id;
 
         if (aYou) return -1;
         if (bYou) return 1;
 
-        if (a.role === "admin" && b.role !== "admin") return -1;
-        if (a.role !== "admin" && b.role === "admin") return 1;
+        if (
+            a.role === "admin" &&
+            b.role !== "admin"
+        ) {
+            return -1;
+        }
 
-        return a.username.localeCompare(b.username);
+        if (
+            a.role !== "admin" &&
+            b.role === "admin"
+        ) {
+            return 1;
+        }
+
+        return a.username.localeCompare(
+            b.username
+        );
     });
+
+    const currentUserMember =
+        group.members.find(
+            (member) =>
+                member.id ===
+                currentUser.user.id
+        );
+
+    const currentUserRole =
+        currentUserMember?.role ?? "member";
+
+    const isOwner =
+        group.createdBy ===
+        currentUser.user.id;
 
     const availableUsers =
         users?.users.filter(
             (user) =>
                 !members.some(
-                    (member) => member.id === user.id
+                    (member) =>
+                        member.id === user.id
                 )
         ) ?? [];
 
-    const isOwner = data.group.createdBy === currentUser.user.id;
+    /*
+     * Save group name
+     */
+    const saveGroupName = () => {
+        const newName =
+            groupName.trim();
+
+        if (!newName) {
+            toast.error(
+                "Group name cannot be empty."
+            );
+            return;
+        }
+
+        if (newName === group.name) {
+            setEditingName(false);
+            return;
+        }
+
+        updateGroup({
+            groupId,
+            name: newName,
+        });
+
+        setEditingName(false);
+    };
+
+    /*
+     * Cancel editing
+     */
+    const cancelEditingName = () => {
+        setGroupName(group.name);
+        setEditingName(false);
+    };
+
+    /*
+     * Add selected members
+     */
+    const handleAddMembers = async () => {
+        if (
+            selectedMembers.length === 0 ||
+            isAddingMembers
+        ) {
+            return;
+        }
+
+        try {
+            await addMembers({
+                groupId,
+                memberIds: selectedMembers,
+            });
+
+            setAddingMembers(false);
+            setSelectedMembers([]);
+            setSearch("");
+
+            toast.success(
+                "Members added successfully."
+            );
+        } catch (error) {
+            toast.error(
+                error instanceof Error
+                    ? error.message
+                    : "Failed to add members."
+            );
+        }
+    };
 
     return (
         <Dialog
@@ -128,483 +316,901 @@ export default function GroupInfoDialog({
             <DialogContent
                 className="
                     flex
-                    h-[80vh]
-                    max-h-[80vh]
+                    h-[min(760px,90vh)]
+                    max-h-[90vh]
+                    w-[calc(100%-2rem)]
                     flex-col
                     overflow-hidden
+                    border
                     border-slate-800
-                    bg-slate-900
+                    bg-slate-950
                     p-0
                     text-white
+                    shadow-2xl
                     sm:max-w-md
                 "
             >
-                {/* Header */}
-                <DialogHeader className="shrink-0 border-b border-slate-800 px-6 py-4">
+                {/* =====================================================
+                    HEADER
+                ====================================================== */}
+
+                <DialogHeader
+                    className="
+                        relative
+                        shrink-0
+                        border-b
+                        border-slate-800/80
+                        bg-slate-950
+                        px-5
+                        pb-5
+                        pt-5
+                    "
+                >
+                    {/* Close */}
                     <button
                         type="button"
-                        onClick={() => onOpenChange(false)}
+                        onClick={() =>
+                            onOpenChange(false)
+                        }
                         className="
                             absolute
-                            left-4
+                            right-4
                             top-4
-                            rounded-full
+                            z-10
+                            rounded-xl
                             p-2
-                            text-slate-400
+                            text-slate-500
                             transition
                             hover:bg-slate-800
                             hover:text-white
                         "
+                        aria-label="Close"
                     >
                         <X className="h-5 w-5" />
                     </button>
-                    <div className="flex flex-col items-center gap-2">
-                        <Avatar className="h-16 w-16 ring-2 ring-slate-700 shadow-lg">
-                            <AvatarFallback className="bg-gradient-to-br from-sky-500 via-blue-600 to-indigo-700 text-xl font-bold text-white">
-                                {data.group.name.charAt(0).toUpperCase()}
+
+                    <div className="flex flex-col items-center">
+                        {/* Group avatar */}
+
+                        <Avatar
+                            className="
+                                mb-3
+                                h-20
+                                w-20
+                                border
+                                border-slate-700
+                                ring-4
+                                ring-slate-900
+                                shadow-xl
+                            "
+                        >
+                            <AvatarFallback
+                                className="
+                                    bg-gradient-to-br
+                                    from-sky-500
+                                    via-blue-600
+                                    to-indigo-700
+                                    text-2xl
+                                    font-bold
+                                    text-white
+                                "
+                            >
+                                {group.name
+                                    .charAt(0)
+                                    .toUpperCase()}
                             </AvatarFallback>
                         </Avatar>
 
-                        <div className="flex items-center gap-2">
-                            {editingName ? (
-                                <input
-                                    autoFocus
-                                    value={groupName}
-                                    onChange={(e) =>
-                                        setGroupName(e.target.value)
-                                    }
-                                    onKeyDown={(e) => {
-                                        if (e.key === "Enter") {
-                                            const newName = groupName.trim();
+                        {/* Group name */}
 
-                                            if (!newName || newName === data.group.name) {
-                                                setEditingName(false);
-                                                return;
+                        <div className="flex min-w-0 items-center justify-center gap-1.5">
+                            {editingName ? (
+                                <>
+                                    <input
+                                        autoFocus
+                                        value={groupName}
+                                        maxLength={50}
+                                        onChange={(e) =>
+                                            setGroupName(
+                                                e.target.value
+                                            )
+                                        }
+                                        onKeyDown={(e) => {
+                                            if (
+                                                e.key ===
+                                                "Enter"
+                                            ) {
+                                                saveGroupName();
                                             }
 
-                                            updateGroup({
-                                                groupId,
-                                                name: newName,
-                                            });
-
-                                            setEditingName(false);
-                                        }
-
-                                        if (e.key === "Escape") {
-                                            setGroupName(data.group.name);
-                                            setEditingName(false);
-                                        }
-                                    }}
-                                    className="
-                                        rounded-lg
-                                        border
-                                        border-slate-700
-                                        bg-slate-800
-                                        px-3
-                                        py-1
-                                        text-center
-                                        text-lg
-                                        font-semibold
-                                        outline-none
-                                        focus:border-sky-500
-                                    "
-                                />
-                            ) : (
-                                <DialogTitle className="text-center text-xl font-bold">
-                                    {groupName}
-                                </DialogTitle>
-                            )}
-
-                            {!editingName ? (
-                                <button
-                                    onClick={() => setEditingName(true)}
-                                    className="
-                                        rounded-lg
-                                        p-1.5
-                                        text-slate-400
-                                        transition
-                                        hover:bg-slate-800
-                                        hover:text-white
-                                    "
-                                >
-                                    <Pencil className="h-4 w-4" />
-                                </button>
-                            ) : (
-                                <div className="flex gap-1">
-                                    <button
-                                        disabled={isUpdating}
-                                        onClick={() => {
-                                            updateGroup({
-                                                groupId,
-                                                name: groupName.trim(),
-                                            });
-
-                                            setEditingName(false);
+                                            if (
+                                                e.key ===
+                                                "Escape"
+                                            ) {
+                                                cancelEditingName();
+                                            }
                                         }}
                                         className="
+                                            h-9
+                                            w-48
                                             rounded-lg
-                                            p-1.5
-                                            text-emerald-400
-                                            hover:bg-slate-800
+                                            border
+                                            border-slate-700
+                                            bg-slate-900
+                                            px-3
+                                            text-center
+                                            text-base
+                                            font-semibold
+                                            text-white
+                                            outline-none
+                                            transition
+                                            focus:border-sky-500
+                                            focus:ring-2
+                                            focus:ring-sky-500/20
                                         "
+                                    />
+
+                                    <button
+                                        type="button"
+                                        disabled={
+                                            isUpdating
+                                        }
+                                        onClick={
+                                            saveGroupName
+                                        }
+                                        className="
+                                            rounded-lg
+                                            p-2
+                                            text-emerald-400
+                                            transition
+                                            hover:bg-emerald-500/10
+                                            disabled:opacity-50
+                                        "
+                                        aria-label="Save group name"
                                     >
-                                        <Check className="h-4 w-4" />
+                                        {isUpdating ? (
+                                            <Loader2 className="h-4 w-4 animate-spin" />
+                                        ) : (
+                                            <Check className="h-4 w-4" />
+                                        )}
                                     </button>
 
                                     <button
-                                        disabled={isUpdating}
-                                        onClick={() => {
-                                            setGroupName(data.group.name);
-                                            setEditingName(false);
-                                        }}
+                                        type="button"
+                                        disabled={
+                                            isUpdating
+                                        }
+                                        onClick={
+                                            cancelEditingName
+                                        }
+                                        className="
+                                            rounded-lg
+                                            p-2
+                                            text-slate-400
+                                            transition
+                                            hover:bg-slate-800
+                                            hover:text-white
+                                            disabled:opacity-50
+                                        "
+                                        aria-label="Cancel editing"
+                                    >
+                                        <X className="h-4 w-4" />
+                                    </button>
+                                </>
+                            ) : (
+                                <>
+                                    <DialogTitle
+                                        className="
+                                            max-w-[260px]
+                                            truncate
+                                            text-center
+                                            text-xl
+                                            font-bold
+                                            text-white
+                                        "
+                                    >
+                                        {group.name}
+                                    </DialogTitle>
+
+                                    <button
+                                        type="button"
+                                        onClick={() =>
+                                            setEditingName(
+                                                true
+                                            )
+                                        }
                                         className="
                                             rounded-lg
                                             p-1.5
-                                            text-red-400
+                                            text-slate-500
+                                            transition
                                             hover:bg-slate-800
+                                            hover:text-white
                                         "
+                                        aria-label="Edit group name"
+                                    >
+                                        <Pencil className="h-4 w-4" />
+                                    </button>
+                                </>
+                            )}
+                        </div>
+
+                        <div className="mt-1.5 flex items-center gap-1.5 text-sm text-slate-500">
+                            <Users className="h-3.5 w-3.5" />
+                            <span>
+                                {group.members.length}{" "}
+                                {group.members.length ===
+                                    1
+                                    ? "member"
+                                    : "members"}
+                            </span>
+                        </div>
+                    </div>
+                </DialogHeader>
+
+                {/* =====================================================
+                    BODY
+                ====================================================== */}
+
+                <div
+                    className="
+                        min-h-0
+                        flex-1
+                        overflow-y-auto
+                        px-4
+                        py-4
+                    "
+                >
+                    {!addingMembers ? (
+                        <>
+                            {/* Members header */}
+
+                            <div className="mb-3 flex items-center justify-between">
+                                <div>
+                                    <h3 className="text-sm font-semibold text-slate-200">
+                                        Members
+                                    </h3>
+
+                                    <p className="mt-0.5 text-xs text-slate-500">
+                                        Manage people in this group
+                                    </p>
+                                </div>
+
+                                <button
+                                    type="button"
+                                    onClick={() =>
+                                        setAddingMembers(
+                                            true
+                                        )
+                                    }
+                                    className="
+                                        flex
+                                        items-center
+                                        gap-1.5
+                                        rounded-lg
+                                        bg-sky-500/10
+                                        px-3
+                                        py-2
+                                        text-xs
+                                        font-semibold
+                                        text-sky-400
+                                        transition
+                                        hover:bg-sky-500/20
+                                        hover:text-sky-300
+                                    "
+                                >
+                                    <UserPlus className="h-3.5 w-3.5" />
+                                    Add
+                                </button>
+                            </div>
+
+                            {/* Members */}
+
+                            <div className="space-y-1">
+                                {members.map(
+                                    (member) => (
+                                        <GroupMemberItem
+                                            key={
+                                                member.id
+                                            }
+                                            member={
+                                                member
+                                            }
+                                            currentUserId={
+                                                currentUser
+                                                    .user
+                                                    .id
+                                            }
+                                            currentUserRole={
+                                                currentUserRole
+                                            }
+                                            groupOwnerId={
+                                                group.createdBy
+                                            }
+                                            groupId={
+                                                groupId
+                                            }
+                                        />
+                                    )
+                                )}
+                            </div>
+                        </>
+                    ) : (
+                        <>
+                            {/* Add members header */}
+
+                            <div className="mb-4">
+                                <div className="mb-3 flex items-center justify-between">
+                                    <div>
+                                        <h3 className="text-sm font-semibold text-slate-200">
+                                            Add members
+                                        </h3>
+
+                                        <p className="mt-0.5 text-xs text-slate-500">
+                                            Select people to add to this group
+                                        </p>
+                                    </div>
+
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setAddingMembers(
+                                                false
+                                            );
+                                            setSearch("");
+                                            setSelectedMembers(
+                                                []
+                                            );
+                                        }}
+                                        className="
+                                            rounded-lg
+                                            p-2
+                                            text-slate-500
+                                            transition
+                                            hover:bg-slate-800
+                                            hover:text-white
+                                        "
+                                        aria-label="Cancel adding members"
                                     >
                                         <X className="h-4 w-4" />
                                     </button>
                                 </div>
-                            )}
-                        </div>
 
-                        <p className="text-sm text-slate-400">
-                            {data.group.members.length} members
-                        </p>
-                    </div>
-                </DialogHeader>
+                                {/* Search */}
 
-                {/* Members */}
-                <div className="flex-1 overflow-y-auto px-4 py-4">
-                    <div className="mb-3 flex items-center justify-between">
-                        <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-400">
-                            Members
-                        </h3>
+                                <div className="relative">
+                                    <Search
+                                        className="
+                                            absolute
+                                            left-3
+                                            top-1/2
+                                            h-4
+                                            w-4
+                                            -translate-y-1/2
+                                            text-slate-500
+                                        "
+                                    />
 
-                        <button
-                            onClick={() => setAddingMembers(true)}
-                            className="
-                                rounded-lg
-                                bg-sky-600
-                                px-3
-                                py-1.5
-                                text-xs
-                                font-medium
-                                text-white
-                                transition
-                                hover:bg-sky-700
-                            "
-                        >
-                            + Add
-                        </button>
-                    </div>
-
-                    {!addingMembers ? (
-                        <div className="space-y-2">
-                            {members.map((member) => (
-                                <GroupMemberItem
-                                    key={member.id}
-                                    member={member}
-                                    currentUserId={currentUser.user.id}
-                                    currentUserRole={
-                                        data.group.members.find(
-                                            (m) => m.id === currentUser.user.id
-                                        )!.role
-                                    }
-                                    groupOwnerId={data.group.createdBy}
-                                    groupId={groupId}
-                                />
-                            ))}
-                        </div>
-                    ) : (
-                        <>
-                            <input
-                                value={search}
-                                onChange={(e) => setSearch(e.target.value)}
-                                placeholder="Search users..."
-                                className="
-                                    mb-4
-                                    w-full
-                                    rounded-lg
-                                    border
-                                    border-slate-700
-                                    bg-slate-800
-                                    px-3
-                                    py-2
-                                    outline-none
-                                    focus:border-sky-500
-                                "
-                            />
-
-                            <div className="space-y-2">
-                                {availableUsers.length === 0 ? (
-                                    <p className="py-6 text-center text-sm text-slate-400">
-                                        No users found.
-                                    </p>
-                                ) : (
-                                    availableUsers.map((user) => {
-                                        const selected = selectedMembers.includes(user.id);
-
-                                        return (
-                                            <button
-                                                key={user.id}
-                                                type="button"
-                                                onClick={() => {
-                                                    setSelectedMembers((prev) =>
-                                                        selected
-                                                            ? prev.filter((id) => id !== user.id)
-                                                            : [...prev, user.id]
-                                                    );
-                                                }}
-                                                className="
-                                                    flex
-                                                    w-full
-                                                    items-center
-                                                    justify-between
-                                                    rounded-xl
-                                                    px-3
-                                                    py-2
-                                                    transition
-                                                    hover:bg-slate-800
-                                                "
-                                            >
-                                                <div className="flex items-center gap-3">
-                                                    <Avatar className="h-10 w-10">
-                                                        <AvatarFallback>
-                                                            {user.username.charAt(0).toUpperCase()}
-                                                        </AvatarFallback>
-                                                    </Avatar>
-
-                                                    <div className="text-left">
-                                                        <p className="font-medium text-white">
-                                                            {user.username}
-                                                        </p>
-
-                                                        <p className="text-xs text-slate-400">
-                                                            {user.email}
-                                                        </p>
-                                                    </div>
-                                                </div>
-
-                                                <input
-                                                    type="checkbox"
-                                                    checked={selected}
-                                                    readOnly
-                                                    className="h-4 w-4 accent-sky-500"
-                                                />
-                                            </button>
-                                        );
-                                    })
-                                )}
+                                    <input
+                                        value={search}
+                                        onChange={(e) =>
+                                            setSearch(
+                                                e.target
+                                                    .value
+                                            )
+                                        }
+                                        placeholder="Search users..."
+                                        className="
+                                            h-11
+                                            w-full
+                                            rounded-xl
+                                            border
+                                            border-slate-800
+                                            bg-slate-900
+                                            pl-10
+                                            pr-4
+                                            text-sm
+                                            text-white
+                                            outline-none
+                                            transition
+                                            placeholder:text-slate-600
+                                            focus:border-sky-500
+                                            focus:ring-2
+                                            focus:ring-sky-500/10
+                                        "
+                                    />
+                                </div>
                             </div>
 
-                            <div className="mt-4 flex gap-2">
-                                <button
-                                    onClick={() => {
-                                        setAddingMembers(false);
-                                        setSearch("");
-                                        setSelectedMembers([]);
-                                    }}
-                                    className="
-                                        flex-1
-                                        rounded-lg
+                            {/* Selected count */}
+
+                            {selectedMembers.length >
+                                0 && (
+                                    <div
+                                        className="
+                                        mb-3
+                                        flex
+                                        items-center
+                                        justify-between
+                                        rounded-xl
                                         border
-                                        border-slate-700
-                                        py-2
+                                        border-sky-500/20
+                                        bg-sky-500/5
+                                        px-3
+                                        py-2.5
                                     "
-                                >
-                                    Cancel
-                                </button>
+                                    >
+                                        <span className="text-xs text-slate-400">
+                                            {selectedMembers.length}{" "}
+                                            selected
+                                        </span>
 
-                                <button
-                                    disabled={
-                                        selectedMembers.length === 0 ||
-                                        isAddingMembers
-                                    }
-                                    onClick={async () => {
-                                        try {
-                                            await addMembers({
-                                                groupId,
-                                                memberIds: selectedMembers,
-                                            });
+                                        <button
+                                            type="button"
+                                            onClick={() =>
+                                                setSelectedMembers(
+                                                    []
+                                                )
+                                            }
+                                            className="text-xs font-medium text-sky-400 hover:text-sky-300"
+                                        >
+                                            Clear
+                                        </button>
+                                    </div>
+                                )}
 
-                                            setAddingMembers(false);
-                                            setSelectedMembers([]);
-                                            setSearch("");
+                            {/* User list */}
 
-                                            toast("member added!")
-                                        } catch (error) {
-                                            toast.error(error instanceof Error ? error.message : "Failed to add members");
+                            <div className="space-y-1">
+                                {isSearchingUsers &&
+                                    search.trim() ? (
+                                    <div className="flex items-center justify-center py-10">
+                                        <Loader2 className="h-5 w-5 animate-spin text-slate-500" />
+                                    </div>
+                                ) : availableUsers.length ===
+                                    0 ? (
+                                    <div className="rounded-xl border border-dashed border-slate-800 px-4 py-10 text-center">
+                                        <Users className="mx-auto mb-2 h-7 w-7 text-slate-700" />
+
+                                        <p className="text-sm text-slate-400">
+                                            No users found
+                                        </p>
+
+                                        <p className="mt-1 text-xs text-slate-600">
+                                            Try a different search
+                                        </p>
+                                    </div>
+                                ) : (
+                                    availableUsers.map(
+                                        (user) => {
+                                            const selected =
+                                                selectedMembers.includes(
+                                                    user.id
+                                                );
+
+                                            return (
+                                                <button
+                                                    key={
+                                                        user.id
+                                                    }
+                                                    type="button"
+                                                    onClick={() =>
+                                                        setSelectedMembers(
+                                                            (
+                                                                prev
+                                                            ) =>
+                                                                selected
+                                                                    ? prev.filter(
+                                                                        (
+                                                                            id
+                                                                        ) =>
+                                                                            id !==
+                                                                            user.id
+                                                                    )
+                                                                    : [
+                                                                        ...prev,
+                                                                        user.id,
+                                                                    ]
+                                                        )
+                                                    }
+                                                    className={`
+                                                        flex
+                                                        w-full
+                                                        items-center
+                                                        justify-between
+                                                        rounded-xl
+                                                        border
+                                                        px-3
+                                                        py-2.5
+                                                        text-left
+                                                        transition
+                                                        ${selected
+                                                            ? "border-sky-500/30 bg-sky-500/10"
+                                                            : "border-transparent hover:bg-slate-900"
+                                                        }
+                                                    `}
+                                                >
+                                                    <div className="flex min-w-0 items-center gap-3">
+                                                        <Avatar className="h-10 w-10 shrink-0">
+                                                            <AvatarFallback
+                                                                className="
+                                                                    bg-gradient-to-br
+                                                                    from-slate-700
+                                                                    to-slate-800
+                                                                    text-sm
+                                                                    font-semibold
+                                                                    text-slate-200
+                                                                "
+                                                            >
+                                                                {user.username
+                                                                    .charAt(
+                                                                        0
+                                                                    )
+                                                                    .toUpperCase()}
+                                                            </AvatarFallback>
+                                                        </Avatar>
+
+                                                        <div className="min-w-0">
+                                                            <p className="truncate text-sm font-medium text-white">
+                                                                {
+                                                                    user.username
+                                                                }
+                                                            </p>
+
+                                                            <p className="truncate text-xs text-slate-500">
+                                                                {
+                                                                    user.email
+                                                                }
+                                                            </p>
+                                                        </div>
+                                                    </div>
+
+                                                    <div
+                                                        className={`
+                                                            flex
+                                                            h-5
+                                                            w-5
+                                                            shrink-0
+                                                            items-center
+                                                            justify-center
+                                                            rounded-md
+                                                            border
+                                                            transition
+                                                            ${selected
+                                                                ? "border-sky-500 bg-sky-500 text-white"
+                                                                : "border-slate-700 bg-slate-900"
+                                                            }
+                                                        `}
+                                                    >
+                                                        {selected && (
+                                                            <Check className="h-3.5 w-3.5" />
+                                                        )}
+                                                    </div>
+                                                </button>
+                                            );
                                         }
-                                    }}
-                                    className="
-                                        flex-1
-                                        rounded-lg
-                                        bg-sky-600
-                                        py-2
-                                        disabled:opacity-50
-                                    "
-                                >
-                                    Add ({selectedMembers.length})
-                                </button>
+                                    )
+                                )}
                             </div>
                         </>
                     )}
                 </div>
 
-                {/* Footer */}
-                {/* Footer */}
-                <div className="border-t border-slate-800 p-4">
+                {/* =====================================================
+                    FOOTER
+                ====================================================== */}
 
-                    {isOwner && !confirmLeave && !confirmDelete && (
-                        <button
-                            onClick={() => setConfirmDelete(true)}
+                <div className="shrink-0 border-t border-slate-800/80 bg-slate-950 p-4">
+                    {addingMembers ? (
+                        <div className="flex gap-2">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setAddingMembers(
+                                        false
+                                    );
+                                    setSearch("");
+                                    setSelectedMembers(
+                                        []
+                                    );
+                                }}
+                                className="
+                                    flex-1
+                                    rounded-xl
+                                    border
+                                    border-slate-800
+                                    bg-slate-900
+                                    py-2.5
+                                    text-sm
+                                    font-medium
+                                    text-slate-300
+                                    transition
+                                    hover:bg-slate-800
+                                "
+                            >
+                                Cancel
+                            </button>
+
+                            <button
+                                type="button"
+                                disabled={
+                                    selectedMembers.length ===
+                                    0 ||
+                                    isAddingMembers
+                                }
+                                onClick={
+                                    handleAddMembers
+                                }
+                                className="
+                                    flex
+                                    flex-1
+                                    items-center
+                                    justify-center
+                                    gap-2
+                                    rounded-xl
+                                    bg-sky-600
+                                    py-2.5
+                                    text-sm
+                                    font-semibold
+                                    text-white
+                                    transition
+                                    hover:bg-sky-500
+                                    disabled:cursor-not-allowed
+                                    disabled:opacity-40
+                                "
+                            >
+                                {isAddingMembers ? (
+                                    <>
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                        Adding...
+                                    </>
+                                ) : (
+                                    <>
+                                        <UserPlus className="h-4 w-4" />
+                                        Add{" "}
+                                        {selectedMembers.length >
+                                            0
+                                            ? `(${selectedMembers.length})`
+                                            : ""}
+                                    </>
+                                )}
+                            </button>
+                        </div>
+                    ) : confirmLeave ? (
+                        <div
                             className="
-                                mb-3
-                                w-full
                                 rounded-xl
-                                py-3
-                                text-sm
-                                font-medium
-                                text-red-500
-                                transition
-                                hover:bg-red-500/10
+                                border
+                                border-red-500/20
+                                bg-red-500/5
+                                p-4
                             "
                         >
-                            Delete Group
-                        </button>
-                    )}
+                            <div className="mb-4 text-center">
+                                <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-red-500/10">
+                                    <LogOut className="h-5 w-5 text-red-400" />
+                                </div>
 
-                    {!confirmLeave && !confirmDelete && (
-                        <button
-                            onClick={() => setConfirmLeave(true)}
-                            className="
-                                w-full
-                                rounded-xl
-                                py-3
-                                text-sm
-                                font-medium
-                                text-red-400
-                                transition
-                                hover:bg-red-500/10
-                            "
-                        >
-                            Leave Group
-                        </button>
-                    )}
-
-                    {confirmLeave && (
-                        <div className="space-y-4 rounded-xl border border-red-900/40 bg-red-500/5 p-4">
-                            <div className="text-center">
-                                <h3 className="font-semibold text-red-400">
-                                    Leave Group?
+                                <h3 className="text-sm font-semibold text-white">
+                                    Leave this group?
                                 </h3>
 
-                                <p className="mt-2 text-sm leading-6 text-slate-400">
-                                    You will no longer receive messages from this group.
-                                    You'll need to be added again by a member to rejoin.
+                                <p className="mt-1.5 text-xs leading-5 text-slate-500">
+                                    You will stop receiving
+                                    messages from this group.
                                 </p>
                             </div>
 
                             <div className="flex gap-2">
                                 <button
-                                    onClick={() => setConfirmLeave(false)}
+                                    type="button"
+                                    onClick={() =>
+                                        setConfirmLeave(
+                                            false
+                                        )
+                                    }
                                     className="
                                         flex-1
                                         rounded-lg
                                         border
-                                        border-slate-700
-                                        bg-slate-800
-                                        py-2
+                                        border-slate-800
+                                        bg-slate-900
+                                        py-2.5
                                         text-sm
+                                        font-medium
+                                        text-slate-300
                                         transition
-                                        hover:bg-slate-700
+                                        hover:bg-slate-800
                                     "
                                 >
                                     Cancel
                                 </button>
 
                                 <button
-                                    onClick={() => leaveGroup(groupId)}
-                                    disabled={isLeaving}
+                                    type="button"
+                                    disabled={
+                                        isLeaving
+                                    }
+                                    onClick={() =>
+                                        leaveGroup(
+                                            groupId
+                                        )
+                                    }
                                     className="
+                                        flex
                                         flex-1
+                                        items-center
+                                        justify-center
+                                        gap-2
                                         rounded-lg
                                         bg-red-600
-                                        py-2
+                                        py-2.5
                                         text-sm
-                                        font-medium
+                                        font-semibold
                                         text-white
                                         transition
-                                        hover:bg-red-700
-                                        disabled:opacity-60
+                                        hover:bg-red-500
+                                        disabled:opacity-50
                                     "
                                 >
-                                    {isLeaving
-                                        ? "Leaving..."
-                                        : "Leave Group"}
+                                    {isLeaving ? (
+                                        <>
+                                            <Loader2 className="h-4 w-4 animate-spin" />
+                                            Leaving...
+                                        </>
+                                    ) : (
+                                        "Leave Group"
+                                    )}
                                 </button>
                             </div>
                         </div>
-                    )}
+                    ) : confirmDelete ? (
+                        <div
+                            className="
+                                rounded-xl
+                                border
+                                border-red-500/20
+                                bg-red-500/5
+                                p-4
+                            "
+                        >
+                            <div className="mb-4 text-center">
+                                <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-red-500/10">
+                                    <Trash2 className="h-5 w-5 text-red-400" />
+                                </div>
 
-                    {confirmDelete && (
-                        <div className="space-y-4 rounded-xl border border-red-900/40 bg-red-500/5 p-4">
-                            <div className="text-center">
-                                <h3 className="font-semibold text-red-500">
-                                    Delete Group?
+                                <h3 className="text-sm font-semibold text-white">
+                                    Delete this group?
                                 </h3>
 
-                                <p className="mt-2 text-sm leading-6 text-slate-400">
-                                    This action is permanent. The group, its messages,
-                                    and all history will be deleted for every member.
+                                <p className="mt-1.5 text-xs leading-5 text-slate-500">
+                                    This permanently deletes the
+                                    group, messages and history
+                                    for everyone.
                                 </p>
                             </div>
 
                             <div className="flex gap-2">
                                 <button
-                                    onClick={() => setConfirmDelete(false)}
+                                    type="button"
+                                    onClick={() =>
+                                        setConfirmDelete(
+                                            false
+                                        )
+                                    }
                                     className="
                                         flex-1
                                         rounded-lg
                                         border
-                                        border-slate-700
-                                        bg-slate-800
-                                        py-2
+                                        border-slate-800
+                                        bg-slate-900
+                                        py-2.5
                                         text-sm
+                                        font-medium
+                                        text-slate-300
                                         transition
-                                        hover:bg-slate-700
+                                        hover:bg-slate-800
                                     "
                                 >
                                     Cancel
                                 </button>
 
                                 <button
-                                    onClick={() => deleteGroup(groupId)}
-                                    disabled={isDeletingGroup}
+                                    type="button"
+                                    disabled={
+                                        isDeletingGroup
+                                    }
+                                    onClick={() =>
+                                        deleteGroup(
+                                            groupId
+                                        )
+                                    }
                                     className="
+                                        flex
                                         flex-1
+                                        items-center
+                                        justify-center
+                                        gap-2
                                         rounded-lg
-                                        bg-red-700
-                                        py-2
+                                        bg-red-600
+                                        py-2.5
                                         text-sm
-                                        font-medium
+                                        font-semibold
                                         text-white
                                         transition
-                                        hover:bg-red-800
-                                        disabled:opacity-60
+                                        hover:bg-red-500
+                                        disabled:opacity-50
                                     "
                                 >
-                                    {isDeletingGroup
-                                        ? "Deleting..."
-                                        : "Delete Group"}
+                                    {isDeletingGroup ? (
+                                        <>
+                                            <Loader2 className="h-4 w-4 animate-spin" />
+                                            Deleting...
+                                        </>
+                                    ) : (
+                                        "Delete Group"
+                                    )}
                                 </button>
                             </div>
                         </div>
-                    )}
+                    ) : (
+                        <div className="space-y-1">
+                            {isOwner && (
+                                <button
+                                    type="button"
+                                    onClick={() =>
+                                        setConfirmDelete(
+                                            true
+                                        )
+                                    }
+                                    className="
+                                        flex
+                                        w-full
+                                        items-center
+                                        justify-center
+                                        gap-2
+                                        rounded-xl
+                                        py-2.5
+                                        text-sm
+                                        font-medium
+                                        text-red-400
+                                        transition
+                                        hover:bg-red-500/10
+                                    "
+                                >
+                                    <Trash2 className="h-4 w-4" />
+                                    Delete Group
+                                </button>
+                            )}
 
+                            <button
+                                type="button"
+                                onClick={() =>
+                                    setConfirmLeave(
+                                        true
+                                    )
+                                }
+                                className="
+                                    flex
+                                    w-full
+                                    items-center
+                                    justify-center
+                                    gap-2
+                                    rounded-xl
+                                    py-2.5
+                                    text-sm
+                                    font-medium
+                                    text-slate-400
+                                    transition
+                                    hover:bg-slate-800
+                                    hover:text-slate-200
+                                "
+                            >
+                                <LogOut className="h-4 w-4" />
+                                Leave Group
+                            </button>
+                        </div>
+                    )}
                 </div>
             </DialogContent>
         </Dialog>
