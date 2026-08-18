@@ -21,7 +21,7 @@ export function useGroupActions() {
                 queryKey: queryKeys.conversations,
             });
 
-            router.push(`/chat/${data.conversationId}`);
+            router.replace(`/chat/${data.conversationId}`);
         },
         onError: (error) => {
             toast.error(error.message);

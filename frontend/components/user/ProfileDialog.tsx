@@ -94,12 +94,8 @@ export default function ProfileDialog({
             newPassword?: string;
         } = {};
 
-        if (
-            values.username !==
-            data.user.username
-        ) {
-            payload.username =
-                values.username;
+        if (values.username !== data.user.username) {
+            payload.username = values.username;
         }
 
         if (values.newPassword) {
@@ -133,18 +129,17 @@ export default function ProfileDialog({
                 className="
                     max-h-[90vh]
                     overflow-y-auto
-                    border
-                    border-slate-800
+                    border-0
                     bg-slate-950
                     p-0
                     text-white
                     shadow-2xl
+                    outline-none
+                    ring-0
                     sm:max-w-md
                 "
             >
-                {/* =================================================
-                    CLOSE BUTTON
-                ================================================== */}
+                {/* Close Button */}
 
                 <button
                     type="button"
@@ -157,28 +152,26 @@ export default function ProfileDialog({
                         top-4
                         z-20
                         rounded-xl
+                        border-0
                         p-2
                         text-slate-500
+                        outline-none
+                        ring-0
                         transition
                         hover:bg-slate-800
                         hover:text-white
                         focus:outline-none
-                        focus:ring-2
-                        focus:ring-slate-700
+                        focus:ring-0
                     "
                     aria-label="Close profile settings"
                 >
                     <X className="h-5 w-5" />
                 </button>
 
-                {/* =================================================
-                    HEADER
-                ================================================== */}
+                {/* Header */}
 
                 <DialogHeader
                     className="
-                        border-b
-                        border-slate-800
                         px-6
                         pb-5
                         pt-6
@@ -202,7 +195,7 @@ export default function ProfileDialog({
                         </p>
                     </div>
 
-                    {/* Account Card */}
+                    {/* Account */}
 
                     <div
                         className="
@@ -211,8 +204,6 @@ export default function ProfileDialog({
                             items-center
                             gap-3
                             rounded-xl
-                            border
-                            border-slate-800
                             bg-slate-900/70
                             p-3
                         "
@@ -245,19 +236,13 @@ export default function ProfileDialog({
                     </div>
                 </DialogHeader>
 
-                {/* =================================================
-                    FORM
-                ================================================== */}
+                {/* Form */}
 
                 <form
-                    onSubmit={handleSubmit(
-                        onSubmit
-                    )}
+                    onSubmit={handleSubmit(onSubmit)}
                     className="px-6 py-5"
                 >
-                    {/* =================================================
-                        PROFILE
-                    ================================================== */}
+                    {/* Profile */}
 
                     <section className="space-y-4">
                         <div className="flex items-start gap-3">
@@ -305,16 +290,17 @@ export default function ProfileDialog({
                                 aria-invalid={
                                     !!errors.username
                                 }
-                                {...register(
-                                    "username"
-                                )}
+                                {...register("username")}
                                 className="
                                     h-11
-                                    border-slate-800
+                                    border-0
                                     bg-slate-900
                                     text-white
+                                    shadow-none
+                                    outline-none
+                                    ring-0
                                     placeholder:text-slate-600
-                                    focus-visible:border-sky-500
+                                    focus-visible:border-0
                                     focus-visible:ring-1
                                     focus-visible:ring-sky-500
                                 "
@@ -322,26 +308,18 @@ export default function ProfileDialog({
 
                             {errors.username && (
                                 <p className="text-xs text-red-400">
-                                    {
-                                        errors
-                                            .username
-                                            .message
-                                    }
+                                    {errors.username.message}
                                 </p>
                             )}
                         </div>
                     </section>
 
-                    {/* =================================================
-                        SECURITY
-                    ================================================== */}
+                    {/* Security */}
 
                     <section
                         className="
                             mt-7
                             space-y-4
-                            border-t
-                            border-slate-800
                             pt-6
                         "
                     >
@@ -404,12 +382,15 @@ export default function ProfileDialog({
                                         )}
                                         className="
                                             h-11
-                                            border-slate-800
+                                            border-0
                                             bg-slate-900
                                             pr-11
                                             text-white
+                                            shadow-none
+                                            outline-none
+                                            ring-0
                                             placeholder:text-slate-600
-                                            focus-visible:border-sky-500
+                                            focus-visible:border-0
                                             focus-visible:ring-1
                                             focus-visible:ring-sky-500
                                         "
@@ -419,8 +400,7 @@ export default function ProfileDialog({
                                         type="button"
                                         onClick={() =>
                                             setShowCurrentPassword(
-                                                (prev) =>
-                                                    !prev
+                                                (prev) => !prev
                                             )
                                         }
                                         className="
@@ -429,10 +409,15 @@ export default function ProfileDialog({
                                             top-1/2
                                             -translate-y-1/2
                                             rounded-md
+                                            border-0
                                             p-1
                                             text-slate-500
+                                            outline-none
+                                            ring-0
                                             transition
                                             hover:text-slate-200
+                                            focus:outline-none
+                                            focus:ring-0
                                         "
                                         aria-label={
                                             showCurrentPassword
@@ -451,8 +436,7 @@ export default function ProfileDialog({
                                 {errors.currentPassword && (
                                     <p className="text-xs text-red-400">
                                         {
-                                            errors
-                                                .currentPassword
+                                            errors.currentPassword
                                                 .message
                                         }
                                     </p>
@@ -487,12 +471,15 @@ export default function ProfileDialog({
                                         )}
                                         className="
                                             h-11
-                                            border-slate-800
+                                            border-0
                                             bg-slate-900
                                             pr-11
                                             text-white
+                                            shadow-none
+                                            outline-none
+                                            ring-0
                                             placeholder:text-slate-600
-                                            focus-visible:border-sky-500
+                                            focus-visible:border-0
                                             focus-visible:ring-1
                                             focus-visible:ring-sky-500
                                         "
@@ -502,8 +489,7 @@ export default function ProfileDialog({
                                         type="button"
                                         onClick={() =>
                                             setShowNewPassword(
-                                                (prev) =>
-                                                    !prev
+                                                (prev) => !prev
                                             )
                                         }
                                         className="
@@ -512,10 +498,15 @@ export default function ProfileDialog({
                                             top-1/2
                                             -translate-y-1/2
                                             rounded-md
+                                            border-0
                                             p-1
                                             text-slate-500
+                                            outline-none
+                                            ring-0
                                             transition
                                             hover:text-slate-200
+                                            focus:outline-none
+                                            focus:ring-0
                                         "
                                         aria-label={
                                             showNewPassword
@@ -534,8 +525,7 @@ export default function ProfileDialog({
                                 {errors.newPassword && (
                                     <p className="text-xs text-red-400">
                                         {
-                                            errors
-                                                .newPassword
+                                            errors.newPassword
                                                 .message
                                         }
                                     </p>
@@ -570,12 +560,15 @@ export default function ProfileDialog({
                                         )}
                                         className="
                                             h-11
-                                            border-slate-800
+                                            border-0
                                             bg-slate-900
                                             pr-11
                                             text-white
+                                            shadow-none
+                                            outline-none
+                                            ring-0
                                             placeholder:text-slate-600
-                                            focus-visible:border-sky-500
+                                            focus-visible:border-0
                                             focus-visible:ring-1
                                             focus-visible:ring-sky-500
                                         "
@@ -585,8 +578,7 @@ export default function ProfileDialog({
                                         type="button"
                                         onClick={() =>
                                             setShowConfirmPassword(
-                                                (prev) =>
-                                                    !prev
+                                                (prev) => !prev
                                             )
                                         }
                                         className="
@@ -595,10 +587,15 @@ export default function ProfileDialog({
                                             top-1/2
                                             -translate-y-1/2
                                             rounded-md
+                                            border-0
                                             p-1
                                             text-slate-500
+                                            outline-none
+                                            ring-0
                                             transition
                                             hover:text-slate-200
+                                            focus:outline-none
+                                            focus:ring-0
                                         "
                                         aria-label={
                                             showConfirmPassword
@@ -617,8 +614,7 @@ export default function ProfileDialog({
                                 {errors.confirmPassword && (
                                     <p className="text-xs text-red-400">
                                         {
-                                            errors
-                                                .confirmPassword
+                                            errors.confirmPassword
                                                 .message
                                         }
                                     </p>
@@ -627,30 +623,25 @@ export default function ProfileDialog({
                         </div>
                     </section>
 
-                    {/* =================================================
-                        SAVE
-                    ================================================== */}
+                    {/* Save */}
 
-                    <div
-                        className="
-                            mt-7
-                            border-t
-                            border-slate-800
-                            pt-5
-                        "
-                    >
+                    <div className="mt-7 pt-5">
                         <Button
                             type="submit"
                             className="
                                 h-11
                                 w-full
                                 rounded-xl
+                                border-0
                                 bg-white
                                 font-semibold
                                 text-slate-950
                                 shadow-lg
+                                outline-none
+                                ring-0
                                 transition
                                 hover:bg-slate-200
+                                focus-visible:ring-0
                                 disabled:cursor-not-allowed
                                 disabled:opacity-50
                             "

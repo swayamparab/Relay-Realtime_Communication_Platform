@@ -65,10 +65,20 @@ export default function SidebarHeader() {
                     <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() =>
-                            setCreateGroupOpen(true)
-                        }
-                        className="h-10 w-10 text-slate-400 hover:bg-slate-800 hover:text-white"
+                        onClick={() => setCreateGroupOpen(true)}
+                        className="
+                            h-10
+                            w-10
+                            border-0
+                            text-slate-400
+                            shadow-none
+                            outline-none
+                            ring-0
+                            hover:bg-slate-800
+                            hover:text-white
+                            focus-visible:ring-0
+                            focus-visible:ring-offset-0
+                        "
                         aria-label="Create Group"
                     >
                         <UsersRound className="h-5 w-5" />

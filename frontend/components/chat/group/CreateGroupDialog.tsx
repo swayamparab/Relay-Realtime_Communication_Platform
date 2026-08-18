@@ -87,19 +87,20 @@ export default function CreateGroupDialog({
                     max-w-md
                     flex-col
                     overflow-hidden
-                    border-slate-800
+                    border-0
                     bg-slate-950
                     p-0
                     text-white
                     shadow-2xl
+                    outline-none
+                    ring-0
                 "
             >
                 {/* Header */}
+
                 <DialogHeader
                     className="
                         shrink-0
-                        border-b
-                        border-slate-800/80
                         bg-slate-900/70
                         px-5
                         py-5
@@ -155,11 +156,16 @@ export default function CreateGroupDialog({
                             }
                             className="
                                 rounded-full
+                                border-0
                                 p-2
                                 text-slate-400
+                                outline-none
+                                ring-0
                                 transition
                                 hover:bg-slate-800
                                 hover:text-white
+                                focus:outline-none
+                                focus:ring-0
                             "
                             aria-label="Close"
                         >
@@ -167,7 +173,8 @@ export default function CreateGroupDialog({
                         </button>
                     </div>
 
-                    {/* Group name */}
+                    {/* Group Name */}
+
                     <div className="mt-4">
                         <input
                             value={groupName}
@@ -180,27 +187,30 @@ export default function CreateGroupDialog({
                                 h-11
                                 w-full
                                 rounded-xl
-                                border
-                                border-slate-700/80
+                                border-0
                                 bg-slate-800/70
                                 px-4
                                 text-sm
                                 text-white
+                                shadow-none
                                 outline-none
+                                ring-0
                                 transition
                                 placeholder:text-slate-500
-                                focus:border-sky-500
                                 focus:bg-slate-800
+                                focus:outline-none
                                 focus:ring-1
-                                focus:ring-sky-500/30
+                                focus:ring-sky-500/40
                             "
                         />
                     </div>
                 </DialogHeader>
 
                 {/* Content */}
+
                 <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
-                    {/* Selected members */}
+                    {/* Selected Members */}
+
                     {selectedUsers.length > 0 && (
                         <div className="mb-5">
                             <div className="mb-2 flex items-center justify-between">
@@ -226,8 +236,6 @@ export default function CreateGroupDialog({
                                                 items-center
                                                 gap-2
                                                 rounded-full
-                                                border
-                                                border-slate-700/70
                                                 bg-slate-800
                                                 py-1
                                                 pl-1
@@ -266,11 +274,16 @@ export default function CreateGroupDialog({
                                                 }
                                                 className="
                                                     rounded-full
+                                                    border-0
                                                     p-0.5
                                                     text-slate-500
+                                                    outline-none
+                                                    ring-0
                                                     transition
                                                     hover:bg-slate-700
                                                     hover:text-white
+                                                    focus:outline-none
+                                                    focus:ring-0
                                                 "
                                                 aria-label={`Remove ${user.username}`}
                                             >
@@ -284,6 +297,7 @@ export default function CreateGroupDialog({
                     )}
 
                     {/* Search */}
+
                     <div className="mb-4">
                         <div className="relative">
                             <Search
@@ -308,25 +322,27 @@ export default function CreateGroupDialog({
                                     h-11
                                     w-full
                                     rounded-xl
-                                    border
-                                    border-slate-800
+                                    border-0
                                     bg-slate-900
                                     pl-10
                                     pr-4
                                     text-sm
                                     text-white
+                                    shadow-none
                                     outline-none
+                                    ring-0
                                     transition
                                     placeholder:text-slate-500
-                                    focus:border-sky-500/70
+                                    focus:outline-none
                                     focus:ring-1
-                                    focus:ring-sky-500/20
+                                    focus:ring-sky-500/40
                                 "
                             />
                         </div>
                     </div>
 
-                    {/* Section title */}
+                    {/* Section Title */}
+
                     <p className="mb-2 px-1 text-xs font-semibold uppercase tracking-wider text-slate-500">
                         {search.trim()
                             ? "Search results"
@@ -334,6 +350,7 @@ export default function CreateGroupDialog({
                     </p>
 
                     {/* Users */}
+
                     <div className="space-y-1">
                         {users?.users.map((user) => {
                             const selected =
@@ -357,7 +374,9 @@ export default function CreateGroupDialog({
                                         px-3
                                         py-2.5
                                         text-left
+                                        outline-none
                                         transition
+                                        focus:outline-none
                                         ${selected
                                             ? "bg-sky-500/10"
                                             : "hover:bg-slate-900"
@@ -392,6 +411,8 @@ export default function CreateGroupDialog({
                                         </div>
                                     </div>
 
+                                    {/* Selection Indicator */}
+
                                     <div
                                         className={`
                                             flex
@@ -401,11 +422,10 @@ export default function CreateGroupDialog({
                                             items-center
                                             justify-center
                                             rounded-full
-                                            border
                                             transition
                                             ${selected
-                                                ? "border-sky-500 bg-sky-500 text-white"
-                                                : "border-slate-600 bg-transparent"
+                                                ? "bg-sky-500 text-white"
+                                                : "bg-slate-800"
                                             }
                                         `}
                                     >
@@ -446,11 +466,10 @@ export default function CreateGroupDialog({
                 </div>
 
                 {/* Footer */}
+
                 <div
                     className="
                         shrink-0
-                        border-t
-                        border-slate-800/80
                         bg-slate-900/70
                         p-4
                         backdrop-blur-xl
@@ -476,6 +495,7 @@ export default function CreateGroupDialog({
                             h-11
                             w-full
                             rounded-xl
+                            border-0
                             bg-gradient-to-r
                             from-sky-500
                             to-blue-600
@@ -484,10 +504,14 @@ export default function CreateGroupDialog({
                             text-white
                             shadow-lg
                             shadow-blue-950/20
+                            outline-none
+                            ring-0
                             transition
                             hover:from-sky-400
                             hover:to-blue-500
                             active:scale-[0.99]
+                            focus:outline-none
+                            focus:ring-0
                             disabled:cursor-not-allowed
                             disabled:bg-slate-800
                             disabled:bg-none

@@ -134,7 +134,7 @@ export default function UserSearchCard({
                     "
                     onClick={() => {
                         if (conversationId) {
-                            router.push(`/chat/${conversationId}`);
+                            router.replace(`/chat/${conversationId}`);
                         }
                     }}
                 >

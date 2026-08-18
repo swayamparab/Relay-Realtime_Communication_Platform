@@ -80,9 +80,7 @@ export default function GroupMemberItem({
                 hover:bg-slate-800/60
             "
         >
-            {/* =====================================================
-                USER
-            ====================================================== */}
+            {/* USER */}
 
             <div className="flex min-w-0 items-center gap-3">
                 <Avatar
@@ -90,8 +88,6 @@ export default function GroupMemberItem({
                         h-11
                         w-11
                         shrink-0
-                        border
-                        border-slate-700
                         bg-slate-800
                     "
                 >
@@ -131,8 +127,6 @@ export default function GroupMemberItem({
                                 className="
                                     shrink-0
                                     rounded-full
-                                    border
-                                    border-slate-700
                                     bg-slate-800
                                     px-2
                                     py-0.5
@@ -160,9 +154,7 @@ export default function GroupMemberItem({
                 </div>
             </div>
 
-            {/* =====================================================
-                ROLE + ACTIONS
-            ====================================================== */}
+            {/* ROLE + ACTIONS */}
 
             <div className="ml-3 flex shrink-0 items-center gap-1.5">
                 {isOwner ? (
@@ -172,8 +164,6 @@ export default function GroupMemberItem({
                             items-center
                             gap-1
                             rounded-full
-                            border
-                            border-amber-500/20
                             bg-amber-500/10
                             px-2.5
                             py-1
@@ -192,8 +182,6 @@ export default function GroupMemberItem({
                             items-center
                             gap-1
                             rounded-full
-                            border
-                            border-sky-500/20
                             bg-sky-500/10
                             px-2.5
                             py-1
@@ -221,8 +209,7 @@ export default function GroupMemberItem({
                                 transition
                                 hover:bg-slate-700/70
                                 hover:text-white
-                                focus:ring-2
-                                focus:ring-sky-500/30
+                                focus:outline-none
                                 disabled:pointer-events-none
                                 disabled:opacity-40
                             "
@@ -240,25 +227,22 @@ export default function GroupMemberItem({
                             sideOffset={6}
                             className="
                                 w-48
-                                border
-                                border-slate-800
                                 bg-slate-950
                                 p-1
                                 text-white
                                 shadow-xl
+                                outline-none
+                                ring-0
+                                border-0
                             "
                         >
-                            {member.role ===
-                                "member" ? (
+                            {member.role === "member" ? (
                                 <DropdownMenuItem
-                                    disabled={
-                                        isPromotingMember
-                                    }
+                                    disabled={isPromotingMember}
                                     onClick={() =>
                                         promoteMember({
                                             groupId,
-                                            memberId:
-                                                member.id,
+                                            memberId: member.id,
                                         })
                                     }
                                     className="
@@ -278,14 +262,11 @@ export default function GroupMemberItem({
                                 </DropdownMenuItem>
                             ) : (
                                 <DropdownMenuItem
-                                    disabled={
-                                        isDemotingAdmin
-                                    }
+                                    disabled={isDemotingAdmin}
                                     onClick={() =>
                                         demoteAdmin({
                                             groupId,
-                                            memberId:
-                                                member.id,
+                                            memberId: member.id,
                                         })
                                     }
                                     className="
@@ -306,14 +287,11 @@ export default function GroupMemberItem({
                             )}
 
                             <DropdownMenuItem
-                                disabled={
-                                    isRemovingMember
-                                }
+                                disabled={isRemovingMember}
                                 onClick={() =>
                                     removeMember({
                                         groupId,
-                                        memberId:
-                                            member.id,
+                                        memberId: member.id,
                                     })
                                 }
                                 className="

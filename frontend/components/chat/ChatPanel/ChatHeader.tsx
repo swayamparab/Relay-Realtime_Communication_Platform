@@ -152,7 +152,6 @@ export default function ChatHeader({
                     flex
                     h-16
                     items-center
-                    border-b
                     border-slate-800/70
                     bg-slate-900/80
                     px-3
@@ -174,7 +173,6 @@ export default function ChatHeader({
                     flex
                     h-16
                     items-center
-                    border-b
                     border-slate-800/70
                     bg-slate-900/80
                     px-3
@@ -229,7 +227,6 @@ export default function ChatHeader({
                     min-w-0
                     items-center
                     gap-2
-                    border-b
                     border-slate-800/70
                     bg-slate-900/80
                     px-2
@@ -265,7 +262,6 @@ export default function ChatHeader({
                             h-10
                             w-full
                             rounded-xl
-                            border
                             border-slate-700
                             bg-slate-800/80
                             px-3
@@ -360,8 +356,6 @@ export default function ChatHeader({
                     items-center
                     justify-between
                     gap-1
-                    border-b
-                    border-slate-800/70
                     bg-slate-900/80
                     px-1.5
                     backdrop-blur-xl
@@ -383,7 +377,7 @@ export default function ChatHeader({
                     {/* Mobile back */}
                     <button
                         onClick={() =>
-                            router.push("/chat")
+                            router.replace("/chat")
                         }
                         className="
                             shrink-0

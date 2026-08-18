@@ -131,7 +131,6 @@ export default function GroupInfoDialog({
             >
                 <DialogContent
                     className="
-                        border-slate-800
                         bg-slate-950
                         text-white
                         sm:max-w-md
@@ -159,7 +158,6 @@ export default function GroupInfoDialog({
             >
                 <DialogContent
                     className="
-                        border-slate-800
                         bg-slate-950
                         text-white
                         sm:max-w-md
@@ -321,12 +319,13 @@ export default function GroupInfoDialog({
                     w-[calc(100%-2rem)]
                     flex-col
                     overflow-hidden
-                    border
-                    border-slate-800
+                    border-0
                     bg-slate-950
                     p-0
                     text-white
                     shadow-2xl
+                    outline-none
+                    ring-0
                     sm:max-w-md
                 "
             >
@@ -338,8 +337,6 @@ export default function GroupInfoDialog({
                     className="
                         relative
                         shrink-0
-                        border-b
-                        border-slate-800/80
                         bg-slate-950
                         px-5
                         pb-5
@@ -377,8 +374,6 @@ export default function GroupInfoDialog({
                                 mb-3
                                 h-20
                                 w-20
-                                border
-                                border-slate-700
                                 ring-4
                                 ring-slate-900
                                 shadow-xl
@@ -434,8 +429,7 @@ export default function GroupInfoDialog({
                                             h-9
                                             w-48
                                             rounded-lg
-                                            border
-                                            border-slate-700
+                                            border-0
                                             bg-slate-900
                                             px-3
                                             text-center
@@ -444,9 +438,9 @@ export default function GroupInfoDialog({
                                             text-white
                                             outline-none
                                             transition
-                                            focus:border-sky-500
-                                            focus:ring-2
-                                            focus:ring-sky-500/20
+                                            focus:outline-none
+                                            focus:ring-1
+                                            focus:ring-sky-500/30
                                         "
                                     />
 
@@ -704,8 +698,7 @@ export default function GroupInfoDialog({
                                             h-11
                                             w-full
                                             rounded-xl
-                                            border
-                                            border-slate-800
+                                            border-0
                                             bg-slate-900
                                             pl-10
                                             pr-4
@@ -714,9 +707,9 @@ export default function GroupInfoDialog({
                                             outline-none
                                             transition
                                             placeholder:text-slate-600
-                                            focus:border-sky-500
-                                            focus:ring-2
-                                            focus:ring-sky-500/10
+                                            focus:outline-none
+                                            focus:ring-1
+                                            focus:ring-sky-500/30
                                         "
                                     />
                                 </div>
@@ -728,17 +721,15 @@ export default function GroupInfoDialog({
                                 0 && (
                                     <div
                                         className="
-                                        mb-3
-                                        flex
-                                        items-center
-                                        justify-between
-                                        rounded-xl
-                                        border
-                                        border-sky-500/20
-                                        bg-sky-500/5
-                                        px-3
-                                        py-2.5
-                                    "
+                                            mb-3
+                                            flex
+                                            items-center
+                                            justify-between
+                                            rounded-xl
+                                            bg-sky-500/5
+                                            px-3
+                                            py-2.5
+                                        "
                                     >
                                         <span className="text-xs text-slate-400">
                                             {selectedMembers.length}{" "}
@@ -769,7 +760,7 @@ export default function GroupInfoDialog({
                                     </div>
                                 ) : availableUsers.length ===
                                     0 ? (
-                                    <div className="rounded-xl border border-dashed border-slate-800 px-4 py-10 text-center">
+                                    <div className="rounded-xl border-slate-900/50 px-4 py-10 text-center">
                                         <Users className="mx-auto mb-2 h-7 w-7 text-slate-700" />
 
                                         <p className="text-sm text-slate-400">
@@ -819,14 +810,13 @@ export default function GroupInfoDialog({
                                                         items-center
                                                         justify-between
                                                         rounded-xl
-                                                        border
                                                         px-3
                                                         py-2.5
                                                         text-left
                                                         transition
                                                         ${selected
-                                                            ? "border-sky-500/30 bg-sky-500/10"
-                                                            : "border-transparent hover:bg-slate-900"
+                                                            ? "bg-sky-500/10"
+                                                            : "hover:bg-slate-900"
                                                         }
                                                     `}
                                                 >
@@ -874,11 +864,10 @@ export default function GroupInfoDialog({
                                                             items-center
                                                             justify-center
                                                             rounded-md
-                                                            border
                                                             transition
                                                             ${selected
-                                                                ? "border-sky-500 bg-sky-500 text-white"
-                                                                : "border-slate-700 bg-slate-900"
+                                                                ? "bg-sky-500 text-white"
+                                                                : "bg-slate-900"
                                                             }
                                                         `}
                                                     >
@@ -900,7 +889,7 @@ export default function GroupInfoDialog({
                     FOOTER
                 ====================================================== */}
 
-                <div className="shrink-0 border-t border-slate-800/80 bg-slate-950 p-4">
+                <div className="shrink-0 bg-slate-950 p-4">
                     {addingMembers ? (
                         <div className="flex gap-2">
                             <button
@@ -917,8 +906,6 @@ export default function GroupInfoDialog({
                                 className="
                                     flex-1
                                     rounded-xl
-                                    border
-                                    border-slate-800
                                     bg-slate-900
                                     py-2.5
                                     text-sm
@@ -980,8 +967,6 @@ export default function GroupInfoDialog({
                         <div
                             className="
                                 rounded-xl
-                                border
-                                border-red-500/20
                                 bg-red-500/5
                                 p-4
                             "
@@ -1012,8 +997,6 @@ export default function GroupInfoDialog({
                                     className="
                                         flex-1
                                         rounded-lg
-                                        border
-                                        border-slate-800
                                         bg-slate-900
                                         py-2.5
                                         text-sm
@@ -1068,7 +1051,6 @@ export default function GroupInfoDialog({
                         <div
                             className="
                                 rounded-xl
-                                border
                                 border-red-500/20
                                 bg-red-500/5
                                 p-4
@@ -1101,8 +1083,6 @@ export default function GroupInfoDialog({
                                     className="
                                         flex-1
                                         rounded-lg
-                                        border
-                                        border-slate-800
                                         bg-slate-900
                                         py-2.5
                                         text-sm
