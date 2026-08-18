@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 
-import { savePushSubscription, sendPushToUser } from "./push-notifications.service";
+import { removePushSubscription, savePushSubscription } from "./push-notifications.service";
 
 export async function subscribeToPush(
     req: Request,
@@ -58,7 +58,48 @@ export async function subscribeToPush(
     }
 }
 
+export async function unsubscribeFromPush(
+    req: Request,
+    res: Response
+) {
+    try {
+        const userId = req.userId;
 
+        if (!userId) {
+            return res.status(401).json({
+                message: "Unauthorized",
+            });
+        }
+
+        const { endpoint } = req.body;
+
+        if (typeof endpoint !== "string") {
+            return res.status(400).json({
+                message: "Invalid push subscription endpoint.",
+            });
+        }
+
+        await removePushSubscription(
+            userId,
+            endpoint
+        );
+
+        return res.json({
+            success: true,
+            message: "Push subscription removed.",
+        });
+    } catch (error) {
+        console.error(
+            "Unsubscribe from push error:",
+            error
+        );
+
+        return res.status(500).json({
+            message:
+                "Failed to remove push subscription.",
+        });
+    }
+}
 
 // export async function testPushNotification(
 //     req: Request,

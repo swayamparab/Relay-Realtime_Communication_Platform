@@ -3,9 +3,22 @@
 import { useEffect } from "react";
 
 import { subscribeToPush } from "@/services/push-notifications";
+import { useCurrentUser } from "@/hooks/user/useCurrentUser";
 
 export function usePushNotifications() {
+    const { data: currentUser, isLoading } =
+        useCurrentUser();
+
     useEffect(() => {
+        // Don't do anything while auth state is loading.
+        if (isLoading) {
+            return;
+        }
+
+        // User is not logged in.
+        if (!currentUser?.user) {
+            return;
+        }
 
         async function setupPushNotifications() {
             if (
@@ -91,7 +104,7 @@ export function usePushNotifications() {
         }
 
         setupPushNotifications();
-    }, []);
+    }, [currentUser, isLoading]);
 }
 
 function urlBase64ToUint8Array(

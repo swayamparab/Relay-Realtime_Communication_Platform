@@ -1,6 +1,6 @@
 import webpush from "web-push";
 
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "../../db";
 
 import { pushSubscriptions } from "../../db/schema/push_subscriptions";
@@ -96,6 +96,43 @@ export async function savePushSubscription(
     return created;
 }
 
+export async function removePushSubscription(
+    userId: string,
+    endpoint: string
+) {
+    const [deleted] =
+        await db
+            .delete(pushSubscriptions)
+            .where(
+                and(
+                    eq(
+                        pushSubscriptions.userId,
+                        userId
+                    ),
+                    eq(
+                        pushSubscriptions.endpoint,
+                        endpoint
+                    )
+                )
+            )
+            .returning();
+
+    return deleted;
+}
+
+export async function removeExpiredPushSubscription(
+    endpoint: string
+) {
+    await db
+        .delete(pushSubscriptions)
+        .where(
+            eq(
+                pushSubscriptions.endpoint,
+                endpoint
+            )
+        );
+}
+
 export async function sendPushToUser(
     userId: string,
     payload: PushPayload
@@ -118,8 +155,8 @@ export async function sendPushToUser(
     let sent = 0;
 
     for (const subscription of subscriptions) {
-        const success =
-            await sendPushNotification(
+        try {
+            await webpush.sendNotification(
                 {
                     endpoint:
                         subscription.endpoint,
@@ -127,15 +164,41 @@ export async function sendPushToUser(
                     keys: {
                         p256dh:
                             subscription.p256dh,
+
                         auth:
                             subscription.auth,
                     },
                 },
-                payload
+                JSON.stringify(payload)
             );
 
-        if (success) {
             sent++;
+        } catch (error: any) {
+            console.error(
+                "Failed to send push notification:",
+                error
+            );
+
+            /*
+             * 404 / 410 means the push subscription
+             * is no longer valid.
+             *
+             * Remove it from the database so we
+             * don't keep trying to send to it.
+             */
+            if (
+                error?.statusCode === 404 ||
+                error?.statusCode === 410
+            ) {
+                await removeExpiredPushSubscription(
+                    subscription.endpoint
+                );
+
+                console.log(
+                    "Removed expired push subscription:",
+                    subscription.endpoint
+                );
+            }
         }
     }
 
@@ -166,7 +229,8 @@ export async function notifyNewMessage(
             ? `${data.senderUsername}: ${data.message}`
             : data.message,
 
-        url: `/chat/${data.conversationId}`,
+        url:
+            `/chat/${data.conversationId}`,
 
         conversationId:
             data.conversationId,

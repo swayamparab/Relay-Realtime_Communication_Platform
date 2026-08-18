@@ -26,6 +26,7 @@ import {
     Settings,
     UsersRound,
 } from "lucide-react";
+import { unsubscribeFromPush } from "@/services/push-notifications";
 
 export default function SidebarHeader() {
     const { data } = useCurrentUser();
@@ -40,6 +41,37 @@ export default function SidebarHeader() {
 
     async function handleLogout() {
         try {
+            // Remove this device's push subscription
+            // from the backend before logging out.
+            if (
+                "serviceWorker" in navigator &&
+                "PushManager" in window
+            ) {
+                const registration =
+                    await navigator.serviceWorker.getRegistration(
+                        "/sw.js"
+                    );
+
+                if (registration) {
+                    const subscription =
+                        await registration.pushManager.getSubscription();
+
+                    if (subscription) {
+                        try {
+                            await unsubscribeFromPush(
+                                subscription
+                            );
+                        } catch (error) {
+                            console.error(
+                                "Failed to remove push subscription:",
+                                error
+                            );
+                        }
+                    }
+                }
+            }
+
+            // Now logout normally
             await api.post("/auth/logout");
 
             queryClient.clear();
