@@ -15,7 +15,9 @@ export default function ConversationItem({
 }: ConversationItemProps) {
     const router = useRouter();
 
-    const { conversationId: currentConversationId } = useParams<{
+    const {
+        conversationId: currentConversationId,
+    } = useParams<{
         conversationId?: string;
     }>();
 
@@ -24,32 +26,37 @@ export default function ConversationItem({
 
     const { onlineUsers } = useSocket();
 
-    const isGroup = conversation.type === "group";
+    const { data: currentUser } = useCurrentUser();
+
+    const isGroup =
+        conversation.type === "group";
 
     const title = isGroup
         ? conversation.group!.name
         : conversation.otherUser!.username;
 
-    const isOnline = !isGroup
-        ? onlineUsers.includes(conversation.otherUser!.id)
-        : false;
+    const isOnline =
+        !isGroup &&
+        onlineUsers.includes(
+            conversation.otherUser!.id
+        );
 
-    const { data: currentUser } = useCurrentUser();
-
-    const lastMessagePreview = !conversation.lastMessage
-        ? "No messages yet"
-        : conversation.lastMessage.type === "text"
-            ? conversation.lastMessage.content
-            : conversation.lastMessage.type === "image"
-                ? "📷 Image"
-                : conversation.lastMessage.type === "video"
-                    ? "🎥 Video"
-                    : conversation.lastMessage.type === "file"
-                        ? "📄 File"
-                        : "🎤 Voice message";
+    const lastMessagePreview =
+        !conversation.lastMessage
+            ? "No messages yet"
+            : conversation.lastMessage.type === "text"
+                ? conversation.lastMessage.content
+                : conversation.lastMessage.type === "image"
+                    ? "📷 Image"
+                    : conversation.lastMessage.type === "video"
+                        ? "🎥 Video"
+                        : conversation.lastMessage.type === "file"
+                            ? "📄 File"
+                            : "🎤 Voice message";
 
     const senderName =
-        conversation.lastMessage?.sender.id === currentUser?.user.id
+        conversation.lastMessage?.sender.id ===
+            currentUser?.user.id
             ? "You"
             : conversation.lastMessage?.sender.username;
 
@@ -60,29 +67,61 @@ export default function ConversationItem({
                 ? `${senderName}: ${lastMessagePreview}`
                 : lastMessagePreview;
 
+    const handleConversationClick = () => {
+        const path =
+            `/chat/${conversation.conversationId}`;
+
+        /*
+         * If we are already inside a chat,
+         * replace the current chat instead of
+         * adding another browser history entry.
+         *
+         * /chat -> Chat A  = push
+         * Chat A -> Chat B = replace
+         * Chat B -> Chat C = replace
+         *
+         * Therefore browser Back from any chat
+         * returns to the conversation list.
+         */
+        if (currentConversationId) {
+            router.replace(path);
+        } else {
+            router.push(path);
+        }
+    };
+
     return (
         <button
-            onClick={() =>
-                router.push(`/chat/${conversation.conversationId}`)
-            }
+            onClick={handleConversationClick}
             className={`
-                mx-2 my-1 flex w-[calc(100%-1rem)] items-center gap-3 rounded-2xl px-4 py-3
-                text-left transition-all duration-200
+                mx-2
+                my-1
+                flex
+                w-[calc(100%-1rem)]
+                items-center
+                gap-3
+                rounded-2xl
+                px-4
+                py-3
+                text-left
+                transition-all
+                duration-200
+
                 ${isActive
                     ? `
-                        bg-gradient-to-r
-                        from-sky-500/15
-                        to-blue-500/10
-                        shadow-lg
-                        ring-1
-                        ring-sky-400/30
-                        scale-[1.01]
-                    `
+                            bg-gradient-to-r
+                            from-sky-500/15
+                            to-blue-500/10
+                            shadow-lg
+                            ring-1
+                            ring-sky-400/30
+                            scale-[1.01]
+                        `
                     : `
-                        hover:bg-slate-800/70
-                        hover:scale-[1.01]
-                        hover:shadow-md
-                    `
+                            hover:bg-slate-800/70
+                            hover:scale-[1.01]
+                            hover:shadow-md
+                        `
                 }
             `}
         >
@@ -106,7 +145,9 @@ export default function ConversationItem({
                             text-white
                         "
                     >
-                        {title.charAt(0).toUpperCase()}
+                        {title
+                            .charAt(0)
+                            .toUpperCase()}
                     </AvatarFallback>
                 </Avatar>
 
@@ -139,11 +180,27 @@ export default function ConversationItem({
             </div>
 
             <div className="min-w-0 flex-1">
-                <p className="truncate text-[15px] font-semibold tracking-[0.01em] text-white">
+                <p
+                    className="
+                        truncate
+                        text-[15px]
+                        font-semibold
+                        tracking-[0.01em]
+                        text-white
+                    "
+                >
                     {title}
                 </p>
 
-                <p className="mt-0.5 truncate text-[13px] leading-5 text-slate-400">
+                <p
+                    className="
+                        mt-0.5
+                        truncate
+                        text-[13px]
+                        leading-5
+                        text-slate-400
+                    "
+                >
                     {preview}
                 </p>
             </div>
