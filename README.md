@@ -1,42 +1,36 @@
 # Relay - Real-Time Communication Platform
 
-A modern full-stack real-time communication platform built with **Next.js**, **Express**, **PostgreSQL**, **Drizzle ORM**, **Redis**, **Socket.IO**, and **WebRTC**.
+A modern full-stack real-time communication platform built with **Next.js**, **Express**, **PostgreSQL**, **Drizzle ORM**, **Redis**, **Socket.IO**, **WebRTC**, and **Web Push notifications**.
 
-Relay is a production-style communication platform featuring secure authentication, one-to-one messaging, group chats with role-based administration, media sharing, voice and video calling, group voice and video calling, dynamic 1-to-1 call promotion, participant invitations, presence, caching, rate limiting, and live synchronization powered by Socket.IO and React Query.
+Relay is a production-style communication platform featuring secure JWT authentication, one-to-one and group messaging, role-based group administration, media and voice messages, voice and video calling, group calls, dynamic 1-to-1 → group call promotion, participant invitations, presence, Web Push notifications, Redis caching and rate limiting, and real-time synchronization powered by Socket.IO and React Query.
 
 ---
 
 # Architecture
 
-- **Frontend:** Next.js 15 + React + TypeScript
+- **Frontend:** Next.js 16 + React + TypeScript
 - **Backend:** Express.js + Socket.IO + TypeScript
 - **Database:** PostgreSQL + Drizzle ORM
 - **Cache & Rate Limiting:** Redis
 - **Media Storage:** Cloudinary
 - **Real-Time Communication:** Socket.IO
 - **Voice & Video Calls:** WebRTC
+- **Push Notifications:** Web Push + VAPID
 - **NAT Traversal:** STUN
+- **Containerization:** Docker + Docker Compose
 
 ## Architecture Highlights
 
-- Next.js frontend deployed on Vercel
-- Express + Socket.IO backend deployed on Render
-- API & WebSocket traffic proxied through Vercel rewrites (`/api` and `/socket.io`)
-- Same-origin architecture for secure HttpOnly cookie authentication
-- Layered backend architecture
-- Service-based business logic
-- Cursor-based message pagination
-- Redis-based caching
-- Redis-backed rate limiting
-- WebRTC peer-to-peer media communication
-- Socket.IO-based WebRTC signaling
-- Room-based real-time communication
-- Separate WebRTC architecture for one-to-one and group calls
-- WebRTC mesh architecture for multi-participant calls
-- Dynamic 1-to-1 → group call promotion
-- Reuse of existing microphone/camera MediaStream during call promotion
-- Per-participant RTCPeerConnection management for group calls
-- Runtime group-call participant and invitation state management
+- Next.js frontend on Vercel; Express + Socket.IO backend on Render
+- Vercel rewrites proxy `/api` and `/socket.io` for same-origin HttpOnly cookie authentication
+- Layered backend with service-based business logic
+- Cursor-based message pagination with React Query caching
+- Redis caching and rate limiting
+- Socket.IO room-based real-time synchronization
+- WebRTC peer-to-peer media with Socket.IO signaling and STUN
+- Separate 1-to-1 and group-call WebRTC architectures using mesh networking
+- Dynamic 1-to-1 → group call promotion with local `MediaStream` reuse
+- Per-participant `RTCPeerConnection` management and runtime call/invitation state
 
 ---
 
@@ -54,86 +48,59 @@ Relay is a production-style communication platform featuring secure authenticati
 ## Messaging
 
 - One-to-one real-time messaging
-- Text messages
-- Image messages
-- Video messages
-- Document sharing
-- Reply to messages
-- Edit messages
-- Delete messages
+- Text, image, video, and document messages
+- Reply, edit, and delete messages
+- Message search with navigation
 - Typing indicators
-- Read receipts
-- Unread message counts
-- Live conversation preview updates
-- Automatic conversation reordering
+- Read receipts and unread counts
+- Live conversation previews and automatic reordering
 - Optimistic UI updates
 - Cursor-based infinite scrolling
 - Automatic scroll position restoration
-- Message search
-- Reply previews
-- Media previews
+- Reply and media previews
 - Automatic read synchronization
-- Live message editing
-- Live message deletion
+- Real-time message editing and deletion
 
 ---
 
 ## Real-Time Synchronization
 
-- Socket.IO room architecture
-- Live conversation updates
-- Real-time group synchronization
-- Live member join/leave
-- Live admin promotion/demotion
-- Live group rename
-- Live conversation ordering
-- Live unread count updates
-- Live typing indicators
-- Read receipt synchronization
-- Online user synchronization
+- Socket.IO room-based architecture
+- Live messaging, conversation, and group updates
+- Real-time member and admin changes
+- Live conversation ordering and unread counts
+- Typing indicators and read receipt synchronization
+- Online user and presence synchronization
 
 ---
 
 ## Group Chats
 
-- Create groups
-- Rename groups
-- Add members
-- Remove members
-- Leave groups
-- Delete groups
-- Multiple administrators
-- Promote members to admin
-- Demote admins
-- Real-time group updates
-- Live member synchronization
-- Automatic room management
-- Role-based permissions
+- Create, rename, and delete groups
+- Add, remove, and leave groups
+- Multiple administrators with role-based permissions
+- Promote and demote administrators
+- Real-time group and member synchronization
+- Automatic Socket.IO room management
 
 ---
 
 ## Voice Messages
 
-- Record voice messages
-- Voice message playback
-- Play / Pause
-- Seek support
-- Playback speed controls
+- Record and send voice messages
+- Playback with play/pause and seek
+- Adjustable playback speed
 - Recording timer
-- Auto pause when another voice message starts
+- Automatic pause when another voice message starts
 
 ---
 
 ## Media Sharing
 
-- Image uploads
-- Video uploads
-- Document sharing
-- Cloudinary integration
-- Image preview
-- Video preview
-- File preview
-- Download attachments
+- Image, video, and document uploads
+- Cloudinary media storage
+- Image, video, and file previews
+- Attachment downloads
 
 ---
 
@@ -141,34 +108,26 @@ Relay is a production-style communication platform featuring secure authenticati
 
 ## One-to-One Voice Calling
 
-- Real-time voice calling
-- Incoming call screen
-- Outgoing call screen
-- Busy state handling
-- Call timeout
-- Call duration
-- Mute microphone
-- Ongoing call card
+- Real-time voice calls
+- Incoming and outgoing call UI
+- Busy-state handling
+- Call timeout and duration tracking
+- Microphone mute controls
+- Ongoing call state
+- WebRTC peer-to-peer communication
 - ICE candidate exchange
-- WebRTC signaling through Socket.IO
-- Call state synchronization
+- Socket.IO WebRTC signaling
+- Real-time call state synchronization
 
 ## Group Voice Calling
 
-- Multi-participant voice calls
-- Up to 6 participants
-- Real-time participant synchronization
-- Join / leave group calls
-- Active call state management
-- Group call participant limits
-- Mute microphone
-- Remote mute state synchronization
+- Multi-participant voice calls for up to 6 participants
+- Real-time participant and call-state synchronization
+- Join, leave, and call termination handling
+- Microphone mute with remote mute synchronization
 - Incoming group call notifications
-- Participant invitations
-- Accept / decline group call invitations
-- Call termination synchronization
-- WebRTC mesh peer connections
-- Per-participant WebRTC peer connections
+- Participant invitations with accept/decline support
+- WebRTC mesh architecture with per-participant peer connections
 - Dynamic 1-to-1 → group call promotion
 
 ---
@@ -177,43 +136,31 @@ Relay is a production-style communication platform featuring secure authenticati
 
 ## One-to-One Video Calling
 
-- Real-time video calls
-- Camera toggle
-- Camera switching on mobile
-- Mute microphone
-- Remote camera status
-- Camera-off placeholder
-- Picture-in-Picture support
-- Draggable floating video window
-- Fullscreen / Restore
-- Responsive mobile experience
-- Camera state synchronization
+- Real-time video calls with camera and microphone controls
+- Mobile camera switching and responsive calling UI
+- Remote camera/mute state synchronization
+- Camera-off participant placeholders
+- Picture-in-Picture and draggable video window
+- Fullscreen / restore support
+- ICE candidate exchange and Socket.IO WebRTC signaling
+- Call state synchronization
 
 ## Group Video Calling
 
-- Multi-participant video calls
-- Up to 6 participants
-- Responsive participant grid
-- Desktop and mobile layouts
-- Real-time participant synchronization
-- Camera toggle
-- Remote camera state synchronization
-- Camera-off participant avatars
-- Mute microphone
-- Remote mute indicators
-- Participant usernames
-- Incoming group call notifications
-- Participant invitations
-- Accept / decline group call invitations
-- Join / leave group calls
-- Group call termination
+- Multi-participant video calls with up to 6 participants
+- Responsive participant grid for desktop and mobile
+- Real-time participant, camera, and microphone state synchronization
+- Camera toggle and camera-off participant avatars
+- Participant usernames and mute indicators
+- Incoming call notifications and participant invitations
+- Accept / decline invitations
+- Join / leave and call termination synchronization
 - Dynamic 1-to-1 → group call promotion
-- WebRTC peer-to-peer media
-- WebRTC mesh architecture
-- Per-participant WebRTC peer connections
-- Socket.IO signaling
+- WebRTC peer-to-peer media with mesh architecture
+- Per-participant `RTCPeerConnection` management
+- Socket.IO WebRTC signaling
 - STUN-based connection establishment
-- Local MediaStream reuse during call promotion
+- Local `MediaStream` reuse during call promotion
 
 ---
 
@@ -326,7 +273,7 @@ The PostgreSQL `group_calls` record tracks the group-call lifecycle; audio and v
 
 ## Frontend
 
-- Next.js 15
+- Next.js 16
 - React
 - TypeScript
 - Tailwind CSS
@@ -352,6 +299,7 @@ The PostgreSQL `group_calls` record tracks the group-call lifecycle; audio and v
 - WebRTC signaling
 - JWT
 - bcrypt
+- Web Push
 
 ---
 
@@ -366,73 +314,24 @@ The PostgreSQL `group_calls` record tracks the group-call lifecycle; audio and v
 
 ---
 
-# Technical Highlights
+## Technical Highlights
 
-- Layered backend architecture
-- Service-based business logic
-- Socket.IO event-driven architecture
-- Room-based real-time communication
-- WebRTC peer-to-peer calling
-- WebRTC mesh architecture for group calls
-- Dynamic 1-to-1 → group call promotion
-- Persistent group-call records using PostgreSQL
-- Runtime group-call participant tracking
-- Group-call invitation state management
-- Reusable local MediaStream across call transitions
-- Per-participant RTCPeerConnection management
-- Group-call Socket.IO room architecture
-- Socket.IO signaling for WebRTC
-- STUN-based NAT traversal
-- Redis caching
-- Redis-based API rate limiting
-- Cursor-based infinite pagination
-- React Query cache synchronization
-- Optimistic UI updates
-- Secure HttpOnly cookie authentication
-- Role-based group permissions
-- Zod request validation
+- Layered backend architecture with service-based business logic
+- Event-driven Socket.IO architecture with room-based communication
+- WebRTC peer-to-peer calling with mesh architecture for group calls
+- Dynamic 1-to-1 → group call promotion with local `MediaStream` reuse
+- Per-participant `RTCPeerConnection` and remote media stream management
+- Deterministic WebRTC offerer selection and queued ICE candidate handling
+- Socket.IO signaling with STUN-based NAT traversal
+- Persistent group-call records with runtime participant and invitation state
+- Redis caching and API rate limiting
+- Cursor-based infinite pagination with React Query cache synchronization
+- Optimistic UI updates and real-time state synchronization
+- Secure JWT authentication with HttpOnly cookies
+- Web Push notifications with VAPID authentication
+- Role-based group permissions and Zod request validation
 - Drizzle ORM with PostgreSQL
 - Cloudinary media storage
-- Fully typed TypeScript codebase
-- Modular React hooks architecture
+- Fully typed TypeScript codebase with modular React hooks
 - Responsive mobile-first UI
-- Deterministic WebRTC offerer selection using participant user IDs
-- Queued ICE candidate handling until remote descriptions are available
-- Remote media stream management using per-participant Maps
-
----
-
-# Project Structure
-
-frontend/
-├── app/
-├── components/
-│   ├── call/
-│   └── group-call/
-├── hooks/
-│   ├── call/
-│   ├── group-call/
-│   └── webrtc/
-├── providers/
-│   ├── CallProvider.tsx
-│   ├── GroupCallProvider.tsx
-│   ├── WebRTCProvider.tsx
-│   └── GroupWebRTCProvider.tsx
-├── services/
-├── lib/
-└── types/
-
-backend/
-├── modules/
-├── sockets/
-│   ├── events/
-│   └── helpers/
-│       ├── active-calls.ts
-│       ├── group-call-state.ts
-│       └── group-call-invites.ts
-├── middleware/
-├── routes/
-├── db/
-├── services/
-│   └── group-call.service.ts
-└── lib/
+- Dockerized frontend and backend
