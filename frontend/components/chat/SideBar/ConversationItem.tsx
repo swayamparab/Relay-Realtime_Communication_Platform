@@ -63,7 +63,7 @@ export default function ConversationItem({
     return (
         <button
             onClick={() =>
-                router.replace(`/chat/${conversation.conversationId}`)
+                router.push(`/chat/${conversation.conversationId}`)
             }
             className={`
                 mx-2 my-1 flex w-[calc(100%-1rem)] items-center gap-3 rounded-2xl px-4 py-3
