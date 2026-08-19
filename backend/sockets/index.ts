@@ -10,7 +10,10 @@ export function createSocketServer(server: HttpServer){
         cors: {
             origin: env.CLIENT_URL,
             credentials: true
-        }
+        },
+
+        pingInterval: 10000,
+        pingTimeout: 10000
     })
 
     setSocketServer(io);
