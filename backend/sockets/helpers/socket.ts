@@ -1,35 +1,46 @@
 import { getSocketServer } from "../socket-server";
-import { onlineUsers } from "./online-users";
+import {
+    getSocketIds,
+} from "./online-users";
 
 // USER SOCKETS
 
-export function getUserSocket(userId: string) {
-    const socketId = onlineUsers.get(userId);
+export function getUserSockets(userId: string) {
+    const socketIds =
+        getSocketIds(userId);
 
-    if (!socketId) {
-        return null;
+    if (socketIds.size === 0) {
+        return [];
     }
 
-    return (
-        getSocketServer()
-            .sockets
-            .sockets
-            .get(socketId) ?? null
-    );
+    const io = getSocketServer();
+
+    return Array.from(socketIds)
+        .map((socketId) =>
+            io.sockets.sockets.get(socketId)
+        )
+        .filter(
+            (socket): socket is NonNullable<typeof socket> =>
+                !!socket
+        );
 }
 
 export function joinUserToConversation(
     userId: string,
     conversationId: string
 ) {
-    getUserSocket(userId)?.join(conversationId);
+    for (const socket of getUserSockets(userId)) {
+        socket.join(conversationId);
+    }
 }
 
 export function leaveUserFromConversation(
     userId: string,
     conversationId: string
 ) {
-    getUserSocket(userId)?.leave(conversationId);
+    for (const socket of getUserSockets(userId)) {
+        socket.leave(conversationId);
+    }
 }
 
 export function emitToUser<T>(
@@ -37,7 +48,9 @@ export function emitToUser<T>(
     event: string,
     payload: T
 ) {
-    getUserSocket(userId)?.emit(event, payload);
+    for (const socket of getUserSockets(userId)) {
+        socket.emit(event, payload);
+    }
 }
 
 // GROUP EVENTS
@@ -125,7 +138,11 @@ export function emitGroupAdded(
     userId: string,
     payload: GroupAddedPayload
 ) {
-    emitToUser(userId, "group_added", payload);
+    emitToUser(
+        userId,
+        "group_added",
+        payload
+    );
 }
 
 export function emitGroupDeleted(
@@ -134,5 +151,8 @@ export function emitGroupDeleted(
 ) {
     getSocketServer()
         .to(conversationId)
-        .emit("group_deleted", payload);
+        .emit(
+            "group_deleted",
+            payload
+        );
 }
