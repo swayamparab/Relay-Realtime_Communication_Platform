@@ -8,6 +8,7 @@ import conversationRoutes from "./modules/conversation/conversation.routes";
 import messagesRoutes from "./modules/message/message.routes";
 import userRoutes from "./modules/users/user.routes";
 import pushRoutes from "./modules/push-notifications/push-notifications.routes";
+import aiRoutes from "./modules/ai/ai.routes";
 
 const app = express();
 
@@ -37,5 +38,7 @@ app.use("/api/conversations", messagesRoutes);
 app.use("/api/users", userRoutes);
 
 app.use("/api/push-notifications",pushRoutes);
+
+app.use("/api/ai", aiRoutes);
 
 export default app;
