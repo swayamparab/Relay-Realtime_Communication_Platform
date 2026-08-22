@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from "express";
-import { loginRateLimit, signupRateLimit } from "../lib/ratelimit";
+import { aiRateLimit, loginRateLimit, signupRateLimit } from "../lib/ratelimit";
 
 export async function loginLimiter(
     req: Request,
@@ -45,4 +45,32 @@ export async function signupLimiter(
     }
 
     next();
+}
+
+export async function aiLimiter(
+    req: Request,
+    res: Response,
+    next: NextFunction
+) {
+
+    const userId = req.userId;
+
+    if (!userId) {
+        return res.status(401).json({
+            success: false,
+            message: "Unauthorized",
+        });
+    }
+
+    const { success } = await aiRateLimit.limit(userId);
+
+    if (!success) {
+        return res.status(429).json({
+            success: false,
+            message:
+                "AI request limit reached. Please try again later.",
+        });
+    }
+
+    next()
 }

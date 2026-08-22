@@ -14,3 +14,10 @@ export const signupRateLimit = new Ratelimit({
     analytics: true,
     prefix: "relay:signup",
 });
+
+export const aiRateLimit = new Ratelimit({
+    redis,
+    limiter: Ratelimit.slidingWindow(20, "1 h"),
+    analytics: true,
+    prefix: "relay:ai",
+});
