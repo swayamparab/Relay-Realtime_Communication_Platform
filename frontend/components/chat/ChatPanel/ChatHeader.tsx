@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
@@ -11,6 +12,7 @@ import {
     X,
     ChevronUp,
     ChevronDown,
+    Sparkles
 } from "lucide-react";
 
 import { useConversations } from "@/hooks/conversation/useConversations";
@@ -23,14 +25,18 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+    Dialog,
+    DialogContent,
+} from "@/components/ui/dialog";
 
-import { useEffect, useState } from "react";
 import { useDebounce } from "@/hooks/useDebounce";
 import { useSearchMessages } from "@/hooks/message/useSearchMessages";
 import { useCallActions } from "@/hooks/call/useCallActions";
 import GroupInfoDialog from "../group/GroupInfoDialog";
 import { useGroupInfo } from "@/hooks/group/useGroupInfo";
 import { GroupCallControls } from "@/components/group-call/GroupCallControls";
+import AIAssistant from "@/components/ai/AIAssistant";
 
 type ChatHeaderProps = {
     isTyping: boolean;
@@ -61,22 +67,20 @@ export default function ChatHeader({
     const [isSearching, setIsSearching] =
         useState(false);
 
-    const [search, setSearch] =
-        useState("");
+    const [search, setSearch] = useState("");
 
-    const [currentMatch, setCurrentMatch] =
-        useState(0);
+    const [currentMatch, setCurrentMatch] = useState(0);
 
-    const [groupInfoOpen, setGroupInfoOpen] =
-        useState(false);
+    const [groupInfoOpen, setGroupInfoOpen] = useState(false);
+
+    const [aiOpen, setAiOpen] = useState(false);
 
     const {
         startVoiceCall,
         startVideoCall,
     } = useCallActions();
 
-    const debouncedSearch =
-        useDebounce(search, 300);
+    const debouncedSearch = useDebounce(search, 300);
 
     useEffect(() => {
         setCurrentMatch(0);
@@ -623,6 +627,32 @@ export default function ChatHeader({
                         </div>
                     )}
 
+                    {/* AI Assistant */}
+                    <button
+                        onClick={() => setAiOpen(true)}
+                        className="
+                            shrink-0
+                            rounded-xl
+                            p-2
+                            text-slate-400
+                            transition
+                            hover:bg-sky-500/15
+                            hover:text-sky-400
+                            active:scale-95
+                            sm:p-2.5
+                        "
+                        aria-label="Ask Relay AI"
+                    >
+                        <Sparkles
+                            className="
+                                h-[19px]
+                                w-[19px]
+                                sm:h-5
+                                sm:w-5
+                            "
+                        />
+                    </button>
+
                     {/* More menu */}
                     <DropdownMenu>
                         <DropdownMenuTrigger
@@ -670,6 +700,27 @@ export default function ChatHeader({
                     </DropdownMenu>
                 </div>
             </header>
+
+            {/* AI Assistance Dialog */}
+            <Dialog
+                open={aiOpen}
+                onOpenChange={setAiOpen}
+            >
+                <DialogContent
+                    className="
+                        w-[calc(100%-2rem)]
+                        max-w-md
+                        border-slate-800
+                        bg-slate-950
+                        p-0
+                        text-white
+                    "
+                >
+                    <AIAssistant
+                        conversationId={conversationId}
+                    />
+                </DialogContent>
+            </Dialog>
 
             {/* Group Info */}
             {isGroup && (
