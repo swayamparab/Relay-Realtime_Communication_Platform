@@ -53,36 +53,7 @@ export async function savePushSubscription(
     userId: string,
     data: SavePushSubscriptionInput
 ) {
-    const existing =
-        await db.query.pushSubscriptions.findFirst({
-            where: eq(
-                pushSubscriptions.endpoint,
-                data.endpoint
-            ),
-        });
-
-    if (existing) {
-        const [updated] =
-            await db
-                .update(pushSubscriptions)
-                .set({
-                    userId,
-                    p256dh: data.keys.p256dh,
-                    auth: data.keys.auth,
-                    updatedAt: new Date(),
-                })
-                .where(
-                    eq(
-                        pushSubscriptions.endpoint,
-                        data.endpoint
-                    )
-                )
-                .returning();
-
-        return updated;
-    }
-
-    const [created] =
+    const [subscription] =
         await db
             .insert(pushSubscriptions)
             .values({
@@ -91,9 +62,18 @@ export async function savePushSubscription(
                 p256dh: data.keys.p256dh,
                 auth: data.keys.auth,
             })
+            .onConflictDoUpdate({
+                target: pushSubscriptions.endpoint,
+                set: {
+                    userId,
+                    p256dh: data.keys.p256dh,
+                    auth: data.keys.auth,
+                    updatedAt: new Date(),
+                },
+            })
             .returning();
 
-    return created;
+    return subscription;
 }
 
 export async function removePushSubscription(
