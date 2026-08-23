@@ -3,8 +3,7 @@ export async function askAI(
     prompt: string,
     onChunk: (chunk: string) => void
 ) {
-    const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/ai/ask`,
+    const response = await fetch("/api/ai/ask",
         {
             method: "POST",
             credentials: "include",
