@@ -13,26 +13,33 @@ export default function AIAssistant({
     conversationId,
 }: AIAssistantProps) {
     const [prompt, setPrompt] = useState("");
+    const [response, setResponse] = useState("");
 
     const {
         mutate,
-        data,
         isPending,
         isError,
         error,
-        reset
+        reset,
     } = useAskAI();
 
     const handleAsk = () => {
-        if (!prompt.trim() || isPending) {
+        const trimmedPrompt = prompt.trim();
+
+        if (!trimmedPrompt || isPending) {
             return;
         }
 
         reset();
+        setResponse("");
 
         mutate({
             conversationId,
-            prompt: prompt.trim(),
+            prompt: trimmedPrompt,
+
+            onChunk: (chunk) => {
+                setResponse((prev) => prev + chunk);
+            },
         });
     };
 
@@ -51,12 +58,13 @@ export default function AIAssistant({
                     </h3>
 
                     <p className="text-xs text-slate-500">
-                        Ask AI about this conversation
+                        Ask about this conversation
                     </p>
                 </div>
             </div>
 
             {/* Privacy disclaimer */}
+
             <div className="mb-3 rounded-xl border border-slate-800 bg-slate-900/70 p-3">
                 <p className="text-[11px] leading-4 text-slate-500">
                     AI Privacy: Recent messages from this
@@ -66,12 +74,13 @@ export default function AIAssistant({
             </div>
 
             {/* Prompt */}
+
             <textarea
                 value={prompt}
                 onChange={(e) =>
                     setPrompt(e.target.value)
                 }
-                placeholder="Ask about this chat..."
+                placeholder="Ask something about this chat..."
                 rows={3}
                 disabled={isPending}
                 className="
@@ -93,6 +102,7 @@ export default function AIAssistant({
             />
 
             {/* Ask button */}
+
             <button
                 onClick={handleAsk}
                 disabled={
@@ -133,6 +143,7 @@ export default function AIAssistant({
             </button>
 
             {/* Error */}
+
             {isError && (
                 <p className="mt-3 text-xs text-red-400">
                     {(
@@ -144,12 +155,14 @@ export default function AIAssistant({
                             };
                         }
                     )?.response?.data?.message ??
+                        error?.message ??
                         "Failed to get an AI response."}
                 </p>
             )}
 
-            {/* Response */}
-            {data?.response && (
+            {/* Streaming response */}
+
+            {response && (
                 <div className="mt-4 rounded-xl border border-slate-800 bg-slate-900/70 p-3">
                     <div className="mb-2 flex items-center gap-2">
                         <Sparkles className="h-3.5 w-3.5 text-sky-400" />
@@ -157,10 +170,21 @@ export default function AIAssistant({
                         <span className="text-xs font-semibold text-sky-400">
                             Relay AI
                         </span>
+
+                        {isPending && (
+                            <span className="text-xs text-slate-500">
+                                generating...
+                            </span>
+                        )}
                     </div>
 
                     <p className="whitespace-pre-wrap text-sm leading-6 text-slate-300">
-                        {data.response}
+                        {response}
+                        {isPending && (
+                            <span className="ml-1 inline-block animate-pulse">
+                                ▌
+                            </span>
+                        )}
                     </p>
                 </div>
             )}

@@ -7,11 +7,13 @@ export function useAskAI() {
     return useMutation({
         mutationFn: ({
             conversationId,
-            prompt
+            prompt,
+            onChunk
         }: {
             conversationId: string,
-            prompt: string
+            prompt: string,
+            onChunk: (chunk: string) => void;
         }) =>
-            askAI(conversationId, prompt)
+            askAI(conversationId, prompt, onChunk)
     })
 }

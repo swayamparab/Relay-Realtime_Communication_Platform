@@ -7,34 +7,64 @@ export async function askAIController(
     res: Response
 ) {
     try {
-
         const userId = req.userId;
 
         if (!userId) {
             return res.status(401).json({
-                message: "Unauthorized"
-            })
-        }
-
-        const { conversationId, prompt } = req.body;
-
-        if (
-            typeof conversationId !== "string" || typeof prompt !== "string" || !prompt.trim()) {
-            return res.status(400).json({
-                message: "conversationId and prompt are required.",
+                message: "Unauthorized",
             });
         }
 
-        const context = await getConversationContext(userId, conversationId);
+        const {
+            conversationId,
+            prompt,
+        } = req.body;
 
-        const response = await askAI(context, prompt.trim());
+        if (
+            typeof conversationId !== "string" ||
+            typeof prompt !== "string" ||
+            !prompt.trim()
+        ) {
+            return res.status(400).json({
+                message:
+                    "conversationId and prompt are required.",
+            });
+        }
 
-        return res.json({
-            response
-        });
+        const context =
+            await getConversationContext(
+                userId,
+                conversationId
+            );
 
-    }
-    catch (error) {
+        const stream = await askAI(
+            context,
+            prompt.trim()
+        );
+
+        // Tell the browser we're sending a stream
+        res.setHeader(
+            "Content-Type",
+            "text/plain; charset=utf-8"
+        );
+
+        res.setHeader(
+            "Transfer-Encoding",
+            "chunked"
+        );
+
+        // Send Gemini chunks as they arrive
+        for await (const chunk of stream) {
+            const text = chunk.text;
+
+            if (text) {
+                // console.log("GEMINI CHUNK:", text);
+                res.write(text);
+            }
+        }
+
+        res.end();
+    } catch (error) {
         console.error(
             "AI controller error:",
             error
@@ -45,14 +75,18 @@ export async function askAIController(
             error.message === "Unauthorized"
         ) {
             return res.status(403).json({
-                message: "You are not a participant of this conversation.",
+                message:
+                    "You are not a participant of this conversation.",
             });
         }
 
-        return res.status(500).json({
-            message:
-                "Failed to generate AI response.",
-        });
-    }
+        if (!res.headersSent) {
+            return res.status(500).json({
+                message:
+                    "Failed to generate AI response.",
+            });
+        }
 
+        res.end();
+    }
 }
