@@ -1,19 +1,43 @@
 "use client";
 
 import { useState } from "react";
-import { Sparkles, Loader2 } from "lucide-react";
+import {
+    Sparkles,
+    Loader2,
+} from "lucide-react";
 
 import { useAskAI } from "@/hooks/ai/useAskAI";
+import { useUnreadMessageCount } from "@/hooks/ai/useUnreadMessageCount";
+import { useUnreadMessageSummary } from "@/hooks/ai/useUnreadMessageSummary";
 
 type AIAssistantProps = {
     conversationId: string;
 };
+
+const quickActions = [
+    {
+        label: "Summarize chat",
+        prompt:
+            "Summarize the conversation in a concise and easy-to-read format. Include the main topics discussed, important decisions, and any action items. Use short headings and bullet points. Do not invent information that is not present in the conversation.",
+    },
+    {
+        label: "What did we decide?",
+        prompt:
+            "Identify the important decisions made in this conversation. List each decision as a separate bullet point. If no clear decisions were made, say so. Do not invent information.",
+    },
+    {
+        label: "Find action items",
+        prompt:
+            "Identify all tasks or action items mentioned in this conversation. List each task as a separate bullet point and mention the responsible person if the conversation clearly identifies them. If there are no action items, say so. Do not invent information.",
+    },
+];
 
 export default function AIAssistant({
     conversationId,
 }: AIAssistantProps) {
     const [prompt, setPrompt] = useState("");
     const [response, setResponse] = useState("");
+    const [isUnreadSummary, setIsUnreadSummary] = useState(false);
 
     const {
         mutate,
@@ -23,54 +47,302 @@ export default function AIAssistant({
         reset,
     } = useAskAI();
 
-    const handleAsk = () => {
-        const trimmedPrompt = prompt.trim();
+    const {
+        data: unreadSummary,
+        isLoading: isUnreadCountLoading,
+    } = useUnreadMessageCount(
+        conversationId
+    );
 
-        if (!trimmedPrompt || isPending) {
+    const {
+        mutate: summarizeUnread,
+        isPending: isSummarizingUnread,
+        isError: isUnreadSummaryError,
+        error: unreadSummaryError,
+    } = useUnreadMessageSummary();
+
+    const isAIWorking =
+        isPending || isSummarizingUnread;
+
+    const askPrompt = (value: string) => {
+        const trimmedPrompt =
+            value.trim();
+
+        if (
+            !trimmedPrompt ||
+            isAIWorking
+        ) {
             return;
         }
 
         reset();
+
         setResponse("");
+        setPrompt(trimmedPrompt);
 
         mutate({
             conversationId,
             prompt: trimmedPrompt,
 
             onChunk: (chunk) => {
-                setResponse((prev) => prev + chunk);
+                setResponse(
+                    (prev) => prev + chunk
+                );
             },
         });
     };
 
+    const handleAsk = () => {
+        askPrompt(prompt);
+    };
+
+    const handleUnreadSummary = () => {
+        if (isAIWorking) {
+            return;
+        }
+
+        reset();
+        setResponse("");
+        setIsUnreadSummary(true);
+
+        summarizeUnread({
+            conversationId,
+
+            onChunk: (chunk) => {
+                setResponse(
+                    (prev) => prev + chunk
+                );
+            },
+        });
+    };
+
+    const normalErrorMessage =
+        (
+            error as {
+                response?: {
+                    data?: {
+                        message?: string;
+                    };
+                };
+            }
+        )?.response?.data?.message ??
+        error?.message ??
+        "Failed to get an AI response.";
+
+    const unreadSummaryErrorMessage =
+        unreadSummaryError?.message ??
+        "Failed to generate unread summary.";
+
     return (
-        <div className="w-full max-w-md rounded-2xl border border-slate-800 bg-slate-950 p-4 shadow-2xl">
+        <div
+            className="
+                w-full
+                max-w-md
+                rounded-2xl
+                border
+                border-slate-800
+                bg-slate-950
+                p-4
+                shadow-2xl
+            "
+        >
             {/* Header */}
 
-            <div className="mb-4 flex items-center gap-2">
-                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-sky-500/10">
-                    <Sparkles className="h-5 w-5 text-sky-400" />
+            <div
+                className="
+                    mb-4
+                    flex
+                    items-center
+                    gap-2
+                "
+            >
+                <div
+                    className="
+                        flex
+                        h-9
+                        w-9
+                        items-center
+                        justify-center
+                        rounded-xl
+                        bg-sky-500/10
+                    "
+                >
+                    <Sparkles
+                        className="
+                            h-5
+                            w-5
+                            text-sky-400
+                        "
+                    />
                 </div>
 
                 <div>
-                    <h3 className="text-sm font-semibold text-white">
+                    <h3
+                        className="
+                            text-sm
+                            font-semibold
+                            text-white
+                        "
+                    >
                         Relay AI
                     </h3>
 
-                    <p className="text-xs text-slate-500">
+                    <p
+                        className="
+                            text-xs
+                            text-slate-500
+                        "
+                    >
                         Ask about this conversation
                     </p>
                 </div>
             </div>
 
-            {/* Privacy disclaimer */}
+            {/* Privacy Disclaimer */}
 
-            <div className="mb-3 rounded-xl border border-slate-800 bg-slate-900/70 p-3">
-                <p className="text-[11px] leading-4 text-slate-500">
-                    AI Privacy: Recent messages from this
-                    conversation may be shared with Google
-                    Gemini to generate a response.
+            <div
+                className="
+                    mb-3
+                    rounded-xl
+                    border
+                    border-slate-800
+                    bg-slate-900/70
+                    p-3
+                "
+            >
+                <p
+                    className="
+                        text-[11px]
+                        leading-4
+                        text-slate-500
+                    "
+                >
+                    AI Privacy: Recent messages from
+                    this conversation may be shared with
+                    Google Gemini to generate a response.
                 </p>
+            </div>
+
+            {/* Unread Summary */}
+
+            {!isUnreadCountLoading &&
+                unreadSummary?.hasEnoughUnreadMessages && (
+                    <button
+                        type="button"
+                        onClick={
+                            handleUnreadSummary
+                        }
+                        disabled={isAIWorking}
+                        className="
+                            mb-3
+                            flex
+                            w-full
+                            items-center
+                            gap-3
+                            rounded-xl
+                            border
+                            border-sky-500/20
+                            bg-sky-500/5
+                            p-3
+                            text-left
+                            transition
+                            hover:border-sky-500/40
+                            hover:bg-sky-500/10
+                            disabled:cursor-not-allowed
+                            disabled:opacity-40
+                        "
+                    >
+                        {isSummarizingUnread ? (
+                            <Loader2
+                                className="
+                                    h-4
+                                    w-4
+                                    shrink-0
+                                    animate-spin
+                                    text-sky-400
+                                "
+                            />
+                        ) : (
+                            <Sparkles
+                                className="
+                                    h-4
+                                    w-4
+                                    shrink-0
+                                    text-sky-400
+                                "
+                            />
+                        )}
+
+                        <div className="min-w-0">
+                            <p
+                                className="
+                                    text-sm
+                                    font-medium
+                                    text-sky-400
+                                "
+                            >
+                                {isSummarizingUnread
+                                    ? "Summarizing..."
+                                    : "Catch up on this conversation"}
+                            </p>
+
+                            <p
+                                className="
+                                    text-xs
+                                    text-slate-500
+                                "
+                            >
+                                {
+                                    unreadSummary.count
+                                }{" "}
+                                unread messages
+                            </p>
+                        </div>
+                    </button>
+                )}
+
+            {/* Quick Actions */}
+
+            <div
+                className="
+                    mb-3
+                    flex
+                    flex-wrap
+                    gap-2
+                "
+            >
+                {quickActions.map(
+                    (action) => (
+                        <button
+                            key={action.label}
+                            type="button"
+                            onClick={() =>
+                                askPrompt(
+                                    action.prompt
+                                )
+                            }
+                            disabled={isAIWorking}
+                            className="
+                                rounded-lg
+                                border
+                                border-slate-800
+                                bg-slate-900
+                                px-3
+                                py-1.5
+                                text-xs
+                                text-slate-300
+                                transition
+                                hover:border-sky-500/40
+                                hover:bg-sky-500/10
+                                hover:text-sky-400
+                                disabled:cursor-not-allowed
+                                disabled:opacity-40
+                            "
+                        >
+                            {action.label}
+                        </button>
+                    )
+                )}
             </div>
 
             {/* Prompt */}
@@ -82,7 +354,7 @@ export default function AIAssistant({
                 }
                 placeholder="Ask something about this chat..."
                 rows={3}
-                disabled={isPending}
+                disabled={isAIWorking}
                 className="
                     w-full
                     resize-none
@@ -101,13 +373,14 @@ export default function AIAssistant({
                 "
             />
 
-            {/* Ask button */}
+            {/* Ask Button */}
 
             <button
+                type="button"
                 onClick={handleAsk}
                 disabled={
                     !prompt.trim() ||
-                    isPending
+                    isAIWorking
                 }
                 className="
                     mt-3
@@ -131,61 +404,122 @@ export default function AIAssistant({
             >
                 {isPending ? (
                     <>
-                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <Loader2
+                            className="
+                                h-4
+                                w-4
+                                animate-spin
+                            "
+                        />
                         Thinking...
                     </>
                 ) : (
                     <>
-                        <Sparkles className="h-4 w-4" />
+                        <Sparkles
+                            className="h-4 w-4"
+                        />
                         Ask AI
                     </>
                 )}
             </button>
 
-            {/* Error */}
+            {/* Errors */}
 
-            {isError && (
-                <p className="mt-3 text-xs text-red-400">
-                    {(
-                        error as {
-                            response?: {
-                                data?: {
-                                    message?: string;
-                                };
-                            };
-                        }
-                    )?.response?.data?.message ??
-                        error?.message ??
-                        "Failed to get an AI response."}
-                </p>
-            )}
+            {(isError ||
+                isUnreadSummaryError) && (
+                    <div
+                        className="
+                        mt-3
+                        rounded-lg
+                        border
+                        border-red-500/20
+                        bg-red-500/5
+                        p-3
+                    "
+                    >
+                        <p
+                            className="
+                            text-xs
+                            leading-5
+                            text-red-400
+                        "
+                        >
+                            {isUnreadSummaryError
+                                ? unreadSummaryErrorMessage
+                                : normalErrorMessage}
+                        </p>
+                    </div>
+                )}
 
-            {/* Streaming response */}
+            {/* Streaming Response */}
 
             {response && (
-                <div className="mt-4 rounded-xl border border-slate-800 bg-slate-900/70 p-3">
-                    <div className="mb-2 flex items-center gap-2">
-                        <Sparkles className="h-3.5 w-3.5 text-sky-400" />
+                <div
+                    className="
+                        mt-4
+                        rounded-xl
+                        border
+                        border-slate-800
+                        bg-slate-900/70
+                        p-3
+                    "
+                >
+                    <div
+                        className="
+                            mb-2
+                            flex
+                            items-center
+                            gap-2
+                        "
+                    >
+                        <Sparkles
+                            className="
+                                h-3.5
+                                w-3.5
+                                text-sky-400
+                            "
+                        />
 
                         <span className="text-xs font-semibold text-sky-400">
-                            Relay AI
+                            {isUnreadSummary
+                                ? "What you missed"
+                                : "Relay AI"}
                         </span>
 
-                        {isPending && (
-                            <span className="text-xs text-slate-500">
+                        {isAIWorking && (
+                            <span
+                                className="
+                                    text-xs
+                                    text-slate-500
+                                "
+                            >
                                 generating...
                             </span>
                         )}
                     </div>
 
-                    <p className="whitespace-pre-wrap text-sm leading-6 text-slate-300">
+                    <div
+                        className="
+                            whitespace-pre-wrap
+                            text-sm
+                            leading-6
+                            text-slate-300
+                        "
+                    >
                         {response}
-                        {isPending && (
-                            <span className="ml-1 inline-block animate-pulse">
+
+                        {isAIWorking && (
+                            <span
+                                className="
+                                    ml-1
+                                    inline-block
+                                    animate-pulse
+                                "
+                            >
                                 ▌
                             </span>
                         )}
-                    </p>
+                    </div>
                 </div>
             )}
         </div>

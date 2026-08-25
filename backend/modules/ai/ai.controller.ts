@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import { askAI } from "./ai.service";
-import { getConversationContext } from "./ai-context.service";
+import { getConversationContext, getUnreadConversationContext } from "./ai-context.service";
 
 export async function askAIController(
     req: Request,
@@ -84,6 +84,166 @@ export async function askAIController(
             return res.status(500).json({
                 message:
                     "Failed to generate AI response.",
+            });
+        }
+
+        res.end();
+    }
+}
+
+export async function getUnreadMessageCountController(
+    req: Request,
+    res: Response
+) {
+    try {
+        const userId = req.userId;
+
+        if (!userId) {
+            return res.status(401).json({
+                message: "Unauthorized",
+            });
+        }
+
+        const { conversationId } = req.params;
+
+        if (typeof conversationId !== "string") {
+            return res.status(400).json({
+                message:
+                    "conversationId is required.",
+            });
+        }
+
+        const messages =
+            await getUnreadConversationContext(
+                userId,
+                conversationId
+            );
+
+        return res.json({
+            count: messages.length,
+            hasEnoughUnreadMessages:
+                messages.length >= 10,
+        });
+    } catch (error) {
+        console.error(
+            "Get unread message count error:",
+            error
+        );
+
+        if (
+            error instanceof Error &&
+            error.message === "Unauthorized"
+        ) {
+            return res.status(403).json({
+                message:
+                    "You are not a participant of this conversation.",
+            });
+        }
+
+        return res.status(500).json({
+            message:
+                "Failed to get unread message count.",
+        });
+    }
+}
+
+export async function unreadMessageSummaryController(
+    req: Request,
+    res: Response
+) {
+    try {
+        const userId = req.userId;
+
+        if (!userId) {
+            return res.status(401).json({
+                message: "Unauthorized",
+            });
+        }
+
+        const { conversationId } =
+            req.body;
+
+        if (
+            typeof conversationId !== "string"
+        ) {
+            return res.status(400).json({
+                message:
+                    "conversationId is required.",
+            });
+        }
+
+        const unreadContext =
+            await getUnreadConversationContext(
+                userId,
+                conversationId
+            );
+
+        if (!unreadContext.trim()) {
+            return res.status(400).json({
+                message:
+                    "There are no unread messages to summarize.",
+            });
+        }
+
+        const prompt = `
+                        Summarize the unread messages from this conversation.
+
+                        Include:
+                        - Main topics discussed
+                        - Important decisions
+                        - Action items, if any
+
+                        Keep the summary concise and easy to read.
+                        Use short headings and bullet points.
+
+                        Only use information present in the messages.
+                        Do not invent or assume information.
+                        `;
+
+        const stream = await askAI(
+            unreadContext,
+            prompt
+        );
+
+        res.setHeader(
+            "Content-Type",
+            "text/plain; charset=utf-8"
+        );
+
+        res.setHeader(
+            "Transfer-Encoding",
+            "chunked"
+        );
+
+        for await (const chunk of stream) {
+            const text = chunk.text;
+
+            if (text) {
+                res.write(text);
+            }
+        }
+
+        res.end();
+    } catch (error) {
+        console.error(
+            "Unread message summary error:",
+            error
+        );
+
+        if (
+            error instanceof Error &&
+            error.message === "Unauthorized"
+        ) {
+            return res.status(403).json({
+                message:
+                    "You are not a participant of this conversation.",
+            });
+        }
+
+        if (!res.headersSent) {
+            return res.status(500).json({
+                message:
+                    "Failed to generate unread message summary.",
             });
         }
 

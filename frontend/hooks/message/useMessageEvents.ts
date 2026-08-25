@@ -212,17 +212,28 @@ export function useMessageEvents(activeConversationId?: string) {
 
                     return {
                         ...old,
-                        conversations: old.conversations.map((conversation) =>
-                            conversation.conversationId === data.conversationId
-                                ? {
-                                    ...conversation,
-                                    unreadCount: 0,
-                                }
-                                : conversation
+                        conversations: old.conversations.map(
+                            (conversation) =>
+                                conversation.conversationId ===
+                                    data.conversationId
+                                    ? {
+                                        ...conversation,
+                                        unreadCount: 0,
+                                    }
+                                    : conversation
                         ),
                     };
                 }
             );
+
+            // Refresh AI unread-message count
+            queryClient.invalidateQueries({
+                queryKey: [
+                    "ai",
+                    "unread-message-count",
+                    data.conversationId,
+                ],
+            });
         }
 
         function updateConversationPreview(
