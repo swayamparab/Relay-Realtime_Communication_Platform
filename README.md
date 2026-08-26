@@ -2,7 +2,7 @@
 
 A modern full-stack real-time communication platform built with **Next.js**, **Express**, **PostgreSQL**, **Drizzle ORM**, **Redis**, **Socket.IO**, **WebRTC**, and **Web Push notifications**.
 
-Relay is a production-style communication platform featuring secure JWT authentication, one-to-one and group messaging, role-based group administration, media and voice messages, voice and video calling, group calls, dynamic 1-to-1 → group call promotion, participant invitations, presence, Web Push notifications, Redis caching and rate limiting, and real-time synchronization powered by Socket.IO and React Query.
+Relay is a production-style communication platform featuring secure JWT authentication, one-to-one and group messaging, role-based group administration, media and voice messages, voice and video calling, group calls, dynamic 1-to-1 → group call promotion, participant invitations, presence, Web Push notifications, Redis caching and rate limiting, AI-powered conversation assistance and unread-message summarization using Google Gemini, and real-time synchronization powered by Socket.IO and React Query.
 
 ---
 
@@ -71,6 +71,38 @@ Relay is a production-style communication platform featuring secure JWT authenti
 - Live conversation ordering and unread counts
 - Typing indicators and read receipt synchronization
 - Online user and presence synchronization
+
+---
+
+## AI Features
+
+### AI Assistant
+
+- AI assistant available in every conversation
+- Ask natural-language questions about the current conversation
+- Summarize the conversation
+- Identify important decisions
+- Extract action items
+- Free-form prompts
+- Quick actions for common tasks
+- Streaming Gemini responses
+
+### Unread Message AI Summary
+
+- AI summary available when 5+ messages are unread
+- "Summarize X messages with AI" directly inside the message timeline
+- Summarizes missed topics, decisions, and action items
+- Preserves the original unread-message boundary
+- Works correctly even after messages are marked as read
+- Streaming summary generation
+
+### AI Infrastructure
+
+- Google Gemini integration
+- Authenticated AI endpoints
+- Conversation-aware context generation
+- Rate-limited AI endpoints
+- AI privacy disclosure for external model processing
 
 ---
 
@@ -233,7 +265,6 @@ The PostgreSQL `group_calls` record tracks the group-call lifecycle; audio and v
 - Live online users
 - Last seen updates
 - Read receipts
-- Live unread counters
 
 ---
 
@@ -297,6 +328,7 @@ The PostgreSQL `group_calls` record tracks the group-call lifecycle; audio and v
 - Redis
 - Socket.IO
 - WebRTC signaling
+- Google Gemini
 - JWT
 - bcrypt
 - Web Push
@@ -310,6 +342,7 @@ The PostgreSQL `group_calls` record tracks the group-call lifecycle; audio and v
 - Neon PostgreSQL
 - Redis
 - Cloudinary
+- Google Gemini
 - STUN
 
 ---
@@ -325,6 +358,14 @@ The PostgreSQL `group_calls` record tracks the group-call lifecycle; audio and v
 - Socket.IO signaling with STUN-based NAT traversal
 - Persistent group-call records with runtime participant and invitation state
 - Redis caching and API rate limiting
+- Google Gemini integration for conversation-aware AI assistance
+- Backend-generated conversation context from recent messages
+- Streaming Gemini responses through authenticated backend endpoints
+- Quick-action and free-form AI prompting
+- Conversation summarization, decision extraction, and action-item extraction
+- Unread-message summarization using a preserved unread boundary
+- AI privacy disclosure for external model processing
+- Rate-limited AI endpoints for controlled API usage
 - Cursor-based infinite pagination with React Query cache synchronization
 - Optimistic UI updates and real-time state synchronization
 - Secure JWT authentication with HttpOnly cookies
