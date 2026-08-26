@@ -13,6 +13,7 @@ Relay is a production-style communication platform featuring secure JWT authenti
 - **Database:** PostgreSQL + Drizzle ORM
 - **Cache & Rate Limiting:** Redis
 - **Media Storage:** Cloudinary
+- **AI:** Google Gemini
 - **Real-Time Communication:** Socket.IO
 - **Voice & Video Calls:** WebRTC
 - **Push Notifications:** Web Push + VAPID
@@ -27,6 +28,11 @@ Relay is a production-style communication platform featuring secure JWT authenti
 - Cursor-based message pagination with React Query caching
 - Redis caching and rate limiting
 - Socket.IO room-based real-time synchronization
+- Google Gemini integration for conversation-aware AI features
+- Authenticated and rate-limited AI endpoints
+- Backend-generated AI context from recent conversation messages
+- Streaming Gemini responses through backend endpoints
+- AI unread-message summarization using the preserved unread-message boundary
 - WebRTC peer-to-peer media with Socket.IO signaling and STUN
 - Separate 1-to-1 and group-call WebRTC architectures using mesh networking
 - Dynamic 1-to-1 → group call promotion with local `MediaStream` reuse
