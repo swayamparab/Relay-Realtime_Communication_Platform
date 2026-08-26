@@ -69,7 +69,8 @@ export async function getConversationContext(
 
 export async function getUnreadConversationContext(
     userId: string,
-    conversationId: string
+    conversationId: string,
+    unreadSince: string
 ) {
     // Verify user belongs to conversation
     const participant =
@@ -90,7 +91,15 @@ export async function getUnreadConversationContext(
         throw new Error("Unauthorized");
     }
 
-    // Fetch messages sent after the user's last read time
+    const unreadSinceDate =
+        new Date(unreadSince);
+
+    if (Number.isNaN(unreadSinceDate.getTime())) {
+        throw new Error(
+            "Invalid unreadSince timestamp"
+        );
+    }
+
     const unreadMessages =
         await db.query.messages.findMany({
             where: and(
@@ -98,12 +107,10 @@ export async function getUnreadConversationContext(
                     messages.conversationId,
                     conversationId
                 ),
-                participant.lastReadAt
-                    ? gt(
-                        messages.createdAt,
-                        participant.lastReadAt
-                    )
-                    : undefined
+                gt(
+                    messages.createdAt,
+                    unreadSinceDate
+                )
             ),
 
             with: {
@@ -114,14 +121,10 @@ export async function getUnreadConversationContext(
                 },
             },
 
-            orderBy: (messages, { desc }) => [
-                desc(messages.createdAt),
+            orderBy: (messages, { asc }) => [
+                asc(messages.createdAt),
             ],
-
-            limit: 50,
         });
-
-    unreadMessages.reverse();
 
     return unreadMessages
         .map((message) => {

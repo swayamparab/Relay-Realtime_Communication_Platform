@@ -45,7 +45,6 @@ function startOfWeek(date: Date) {
 
     const day = result.getDay();
 
-    // Monday = start of week
     const daysFromMonday =
         day === 0 ? 6 : day - 1;
 
@@ -127,11 +126,13 @@ export default function MessageList({
                 (page) => page.messages
             ) ?? [];
 
+    /*
+     * This is the live value used by MessageBubble.
+     */
     const lastReadAt =
         data?.pages[0]?.lastReadAt ?? null;
 
     const {
-        socket,
         isConnected,
     } = useSocket();
 
@@ -142,6 +143,8 @@ export default function MessageList({
     const {
         mutate: summarizeUnread,
         isPending: isSummarizingUnread,
+        isError: isSummaryError,
+        error: summaryError,
     } = useUnreadMessageSummary();
 
     const containerRef =
@@ -149,12 +152,17 @@ export default function MessageList({
 
     /*
      * ============================================================
-     * UNREAD SNAPSHOT
+     * ORIGINAL UNREAD SNAPSHOT
      * ============================================================
+     *
+     * These MUST NOT change after markConversationAsRead().
      */
 
     const initialUnreadCountRef =
         useRef<number | null>(null);
+
+    const initialLastReadAtRef =
+        useRef<string | null>(null);
 
     const firstUnreadMessageRef =
         useRef<string | null>(null);
@@ -188,7 +196,7 @@ export default function MessageList({
 
     /*
      * ============================================================
-     * RESET WHEN SWITCHING CONVERSATION
+     * RESET
      * ============================================================
      */
 
@@ -214,30 +222,23 @@ export default function MessageList({
         initialUnreadCountRef.current =
             null;
 
+        initialLastReadAtRef.current =
+            null;
+
         firstUnreadMessageRef.current =
             null;
 
-        /*
-         * Summary belongs only to this
-         * conversation-opening session.
-         */
         setAiSummary("");
     }, [conversationId]);
 
     /*
      * ============================================================
-     * CAPTURE INITIAL UNREAD COUNT
+     * CAPTURE ORIGINAL UNREAD STATE
      * ============================================================
      */
 
     useEffect(() => {
         if (!conversationId) {
-            return;
-        }
-
-        if (
-            initialUnreadCountRef.current !== null
-        ) {
             return;
         }
 
@@ -248,19 +249,33 @@ export default function MessageList({
                     conversationId
             );
 
-        if (!conversation) {
-            return;
+        /*
+         * Capture unread count BEFORE it becomes 0.
+         */
+        if (
+            conversation &&
+            initialUnreadCountRef.current === null
+        ) {
+            initialUnreadCountRef.current =
+                conversation.unreadCount;
         }
 
         /*
-         * Capture the unread count before
-         * markConversationAsRead() changes it.
+         * Capture lastReadAt from the first
+         * message response BEFORE mark-as-read
+         * changes it.
          */
-        initialUnreadCountRef.current =
-            conversation.unreadCount;
+        if (
+            initialLastReadAtRef.current === null &&
+            lastReadAt !== null
+        ) {
+            initialLastReadAtRef.current =
+                lastReadAt;
+        }
     }, [
         conversationId,
         conversationsData,
+        lastReadAt,
     ]);
 
     /*
@@ -299,8 +314,7 @@ export default function MessageList({
             );
 
         const containerTop =
-            container.getBoundingClientRect()
-                .top;
+            container.getBoundingClientRect().top;
 
         for (
             const element of messageElements
@@ -313,7 +327,6 @@ export default function MessageList({
                 containerTop
             ) {
                 return {
-                    element,
                     messageId:
                         element.id.replace(
                             "message-",
@@ -325,6 +338,64 @@ export default function MessageList({
         }
 
         return null;
+    }
+
+    /*
+     * ============================================================
+     * FIRST UNREAD MESSAGE
+     * ============================================================
+     */
+
+    function getFirstUnreadMessage() {
+        const unreadCount =
+            initialUnreadCountRef.current;
+
+        if (
+            unreadCount === null ||
+            unreadCount < 5
+        ) {
+            return null;
+        }
+
+        const originalLastReadAt =
+            initialLastReadAtRef.current;
+
+        /*
+         * Best case:
+         * use the original lastReadAt.
+         */
+        if (originalLastReadAt) {
+            const readTime =
+                new Date(
+                    originalLastReadAt
+                ).getTime();
+
+            return (
+                messages.find(
+                    (message) =>
+                        new Date(
+                            message.createdAt
+                        ).getTime() >
+                        readTime
+                ) ?? null
+            );
+        }
+
+        /*
+         * If there was no previous read timestamp,
+         * calculate from the unread count.
+         */
+        const firstUnreadIndex =
+            Math.max(
+                0,
+                messages.length -
+                    unreadCount
+            );
+
+        return (
+            messages[firstUnreadIndex] ??
+            null
+        );
     }
 
     /*
@@ -389,7 +460,8 @@ export default function MessageList({
         }
 
         if (
-            initialUnreadCountRef.current === null
+            initialUnreadCountRef.current ===
+            null
         ) {
             return;
         }
@@ -400,92 +472,78 @@ export default function MessageList({
             return;
         }
 
-        const id = setTimeout(() => {
-            const container =
-                containerRef.current;
+        const timeoutId =
+            setTimeout(() => {
+                const container =
+                    containerRef.current;
 
-            if (!container) {
-                return;
-            }
+                if (!container) {
+                    return;
+                }
 
-            const unreadCount =
-                initialUnreadCountRef.current ?? 0;
+                const unreadCount =
+                    initialUnreadCountRef.current ??
+                    0;
 
-            /*
-             * ====================================================
-             * 5+ UNREAD
-             * ====================================================
-             *
-             * Find the first message after
-             * the previous lastReadAt.
-             */
+                if (unreadCount >= 5) {
+                    const firstUnread =
+                        getFirstUnreadMessage();
 
-            if (unreadCount >= 5) {
-                const firstUnreadIndex =
-                    messages.length -
-                    unreadCount;
+                    if (firstUnread) {
+                        firstUnreadMessageRef.current =
+                            firstUnread.id;
 
-                const firstUnreadMessage =
-                    messages[firstUnreadIndex];
+                        const element =
+                            document.getElementById(
+                                `message-${firstUnread.id}`
+                            );
 
-                if (firstUnreadMessage) {
-                    firstUnreadMessageRef.current =
-                        firstUnreadMessage.id;
+                        if (element) {
+                            element.scrollIntoView({
+                                behavior:
+                                    "auto",
+                                block: "start",
+                            });
 
-                    const element =
-                        document.getElementById(
-                            `message-${firstUnreadMessage.id}`
-                        );
+                            initialScrollDoneRef.current =
+                                true;
 
-                    if (element) {
-                        element.scrollIntoView({
-                            behavior: "auto",
-                            block: "start",
-                        });
+                            previousMessageCountRef.current =
+                                messages.length;
 
-                        initialScrollDoneRef.current =
-                            true;
+                            wasNearBottomRef.current =
+                                false;
 
-                        previousMessageCountRef.current =
-                            messages.length;
-
-                        wasNearBottomRef.current =
-                            false;
-
-                        return;
+                            return;
+                        }
                     }
                 }
-            }
 
-            /*
-             * ====================================================
-             * NORMAL CHAT
-             * ====================================================
-             */
+                container.scrollTo({
+                    top:
+                        container.scrollHeight,
+                    behavior: "auto",
+                });
 
-            container.scrollTo({
-                top: container.scrollHeight,
-                behavior: "auto",
-            });
+                initialScrollDoneRef.current =
+                    true;
 
-            initialScrollDoneRef.current =
-                true;
+                previousMessageCountRef.current =
+                    messages.length;
 
-            previousMessageCountRef.current =
-                messages.length;
-
-            wasNearBottomRef.current =
-                true;
-        }, 0);
+                wasNearBottomRef.current =
+                    true;
+            }, 0);
 
         return () => {
-            clearTimeout(id);
+            clearTimeout(timeoutId);
         };
     }, [
         data,
         conversationId,
         messages.length,
-        lastReadAt,
+        initialUnreadCountRef.current,
+        initialLastReadAtRef.current,
     ]);
 
     /*
@@ -577,7 +635,7 @@ export default function MessageList({
 
         if (
             currentCount >
-            previousCount &&
+                previousCount &&
             previousCount !== 0
         ) {
             const container =
@@ -585,7 +643,8 @@ export default function MessageList({
 
             if (container) {
                 container.scrollTo({
-                    top: container.scrollHeight,
+                    top:
+                        container.scrollHeight,
                     behavior: "smooth",
                 });
             }
@@ -670,7 +729,8 @@ export default function MessageList({
             }
 
             container.scrollTo({
-                top: container.scrollHeight,
+                top:
+                    container.scrollHeight,
                 behavior: "auto",
             });
         }
@@ -714,7 +774,7 @@ export default function MessageList({
                 jumpToMessageId
             );
 
-            const timeout =
+            const timeoutId =
                 setTimeout(() => {
                     setHighlightedMessageId(
                         null
@@ -722,7 +782,7 @@ export default function MessageList({
                 }, 2000);
 
             return () =>
-                clearTimeout(timeout);
+                clearTimeout(timeoutId);
         }
 
         if (
@@ -839,6 +899,15 @@ export default function MessageList({
 
     /*
      * ============================================================
+     * FIRST UNREAD
+     * ============================================================
+     */
+
+    const firstUnreadMessage =
+        getFirstUnreadMessage();
+
+    /*
+     * ============================================================
      * RENDER
      * ============================================================
      */
@@ -888,13 +957,13 @@ export default function MessageList({
                         );
 
                     const isFirstUnread =
-                        firstUnreadMessageRef.current ===
+                        firstUnreadMessage?.id ===
                         message.id;
 
                     return (
                         <div
                             key={message.id}
-                            className="contents"
+                            className="flex flex-col gap-3"
                         >
                             {showDateSeparator && (
                                 <div className="flex justify-center py-2">
@@ -907,42 +976,60 @@ export default function MessageList({
                             )}
 
                             {isFirstUnread &&
-                                initialUnreadCountRef.current !== null &&
-                                initialUnreadCountRef.current >= 5 && (
-                                    <div className="my-1">
+                                initialUnreadCountRef.current !==
+                                    null &&
+                                initialUnreadCountRef.current >=
+                                    5 && (
+                                    <div className="w-full">
                                         {!aiSummary && (
                                             <button
                                                 type="button"
+                                                disabled={
+                                                    isSummarizingUnread
+                                                }
                                                 onClick={() => {
                                                     if (
-                                                        isSummarizingUnread
+                                                        isSummarizingUnread ||
+                                                        !firstUnreadMessage
                                                     ) {
                                                         return;
                                                     }
 
+                                                    /*
+                                                     * Important:
+                                                     * send a timestamp immediately
+                                                     * BEFORE the first unread message.
+                                                     *
+                                                     * Backend will use this instead
+                                                     * of the now-updated lastReadAt.
+                                                     */
+                                                    const unreadSince =
+                                                        new Date(
+                                                            new Date(
+                                                                firstUnreadMessage.createdAt
+                                                            ).getTime() -
+                                                                1
+                                                        ).toISOString();
+
                                                     setAiSummary("");
 
-                                                    summarizeUnread(
-                                                        {
-                                                            conversationId,
-                                                            onChunk:
-                                                                (
-                                                                    chunk
-                                                                ) => {
-                                                                    setAiSummary(
-                                                                        (
-                                                                            prev
-                                                                        ) =>
-                                                                            prev +
-                                                                            chunk
-                                                                    );
-                                                                },
-                                                        }
-                                                    );
+                                                    summarizeUnread({
+                                                        conversationId,
+                                                        unreadSince,
+                                                        onChunk:
+                                                            (
+                                                                chunk
+                                                            ) => {
+                                                                setAiSummary(
+                                                                    (
+                                                                        previous
+                                                                    ) =>
+                                                                        previous +
+                                                                        chunk
+                                                                );
+                                                            },
+                                                    });
                                                 }}
-                                                disabled={
-                                                    isSummarizingUnread
-                                                }
                                                 className="
                                                     flex
                                                     w-full
@@ -965,19 +1052,11 @@ export default function MessageList({
                                                     disabled:opacity-40
                                                 "
                                             >
-                                                {isSummarizingUnread ? (
-                                                    "Summarizing..."
-                                                ) : (
-                                                    <>
-                                                        <Sparkles className="h-4 w-4" />
+                                                <Sparkles className="h-4 w-4" />
 
-                                                        Summarize{" "}
-                                                        {
-                                                            initialUnreadCountRef.current
-                                                        }{" "}
-                                                        messages with AI
-                                                    </>
-                                                )}
+                                                {isSummarizingUnread
+                                                    ? "Summarizing..."
+                                                    : `Summarize ${initialUnreadCountRef.current} messages with AI`}
                                             </button>
                                         )}
 
@@ -998,9 +1077,7 @@ export default function MessageList({
                                                 </div>
 
                                                 <p className="whitespace-pre-wrap text-sm leading-6 text-slate-300">
-                                                    {
-                                                        aiSummary
-                                                    }
+                                                    {aiSummary}
 
                                                     {isSummarizingUnread && (
                                                         <span className="ml-1 animate-pulse">
@@ -1035,6 +1112,14 @@ export default function MessageList({
                         </div>
                     );
                 }
+            )}
+
+            {isSummaryError && (
+                <div className="rounded-xl border border-red-500/20 bg-red-500/5 p-3 text-center text-xs text-red-400">
+                    {summaryError instanceof Error
+                        ? summaryError.message
+                        : "Failed to generate unread summary."}
+                </div>
             )}
         </div>
     );

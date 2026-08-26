@@ -104,22 +104,26 @@ export async function unreadMessageSummaryController(
             });
         }
 
-        const { conversationId } =
-            req.body;
+        const {
+            conversationId,
+            unreadSince,
+        } = req.body;
 
         if (
-            typeof conversationId !== "string"
+            typeof conversationId !== "string" ||
+            typeof unreadSince !== "string"
         ) {
             return res.status(400).json({
                 message:
-                    "conversationId is required.",
+                    "conversationId and unreadSince are required.",
             });
         }
 
         const unreadContext =
             await getUnreadConversationContext(
                 userId,
-                conversationId
+                conversationId,
+                unreadSince
             );
 
         if (!unreadContext.trim()) {

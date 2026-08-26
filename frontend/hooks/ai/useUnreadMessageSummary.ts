@@ -6,10 +6,12 @@ export function useUnreadMessageSummary() {
     return useMutation({
         mutationFn: async ({
             conversationId,
+            unreadSince,
             onChunk,
             onSuccess,
         }: {
             conversationId: string;
+            unreadSince: string;
             onChunk: (chunk: string) => void;
             onSuccess?: () => void;
         }) => {
@@ -24,6 +26,7 @@ export function useUnreadMessageSummary() {
                     },
                     body: JSON.stringify({
                         conversationId,
+                        unreadSince
                     }),
                 }
             );
