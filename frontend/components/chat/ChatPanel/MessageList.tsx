@@ -420,18 +420,13 @@ export default function MessageList({
              * the previous lastReadAt.
              */
 
-            if (
-                unreadCount >= 5
-            ) {
+            if (unreadCount >= 5) {
+                const firstUnreadIndex =
+                    messages.length -
+                    unreadCount;
+
                 const firstUnreadMessage =
-                    messages.find(
-                        (message) =>
-                            lastReadAt &&
-                            new Date(
-                                message.createdAt
-                            ) >
-                            new Date(lastReadAt)
-                    );
+                    messages[firstUnreadIndex];
 
                 if (firstUnreadMessage) {
                     firstUnreadMessageRef.current =

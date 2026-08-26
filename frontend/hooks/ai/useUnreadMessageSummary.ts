@@ -13,14 +13,14 @@ export function useUnreadMessageSummary() {
             onChunk: (chunk: string) => void;
             onSuccess?: () => void;
         }) => {
-            const response = await fetch(
-                "/api/ai/unread-summary",
+            const response = await fetch("/api/ai/unread-summary",
                 {
                     method: "POST",
                     credentials: "include",
                     headers: {
                         "Content-Type":
                             "application/json",
+                        Accept: "text/plain",
                     },
                     body: JSON.stringify({
                         conversationId,
