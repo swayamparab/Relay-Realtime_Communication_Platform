@@ -91,62 +91,6 @@ export async function askAIController(
     }
 }
 
-export async function getUnreadMessageCountController(
-    req: Request,
-    res: Response
-) {
-    try {
-        const userId = req.userId;
-
-        if (!userId) {
-            return res.status(401).json({
-                message: "Unauthorized",
-            });
-        }
-
-        const { conversationId } = req.params;
-
-        if (typeof conversationId !== "string") {
-            return res.status(400).json({
-                message:
-                    "conversationId is required.",
-            });
-        }
-
-        const messages =
-            await getUnreadConversationContext(
-                userId,
-                conversationId
-            );
-
-        return res.json({
-            count: messages.length,
-            hasEnoughUnreadMessages:
-                messages.length >= 10,
-        });
-    } catch (error) {
-        console.error(
-            "Get unread message count error:",
-            error
-        );
-
-        if (
-            error instanceof Error &&
-            error.message === "Unauthorized"
-        ) {
-            return res.status(403).json({
-                message:
-                    "You are not a participant of this conversation.",
-            });
-        }
-
-        return res.status(500).json({
-            message:
-                "Failed to get unread message count.",
-        });
-    }
-}
-
 export async function unreadMessageSummaryController(
     req: Request,
     res: Response

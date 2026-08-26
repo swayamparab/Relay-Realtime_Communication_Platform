@@ -4,11 +4,13 @@ import {
     useEffect,
     useLayoutEffect,
     useRef,
+    useState,
 } from "react";
 import { useParams } from "next/navigation";
 
 import { useMessages } from "@/hooks/message/useMessages";
 import { useCurrentUser } from "@/hooks/user/useCurrentUser";
+import { useConversations } from "@/hooks/conversation/useConversations";
 
 import MessageBubble from "./MessageBubble";
 
@@ -16,6 +18,10 @@ import { useMarkConversationAsRead } from "@/hooks/conversation/useMarkConversat
 import { useSocket } from "@/hooks/useSocket";
 
 import type { Message } from "@/types/message";
+
+import { Sparkles } from "lucide-react";
+
+import { useUnreadMessageSummary } from "@/hooks/ai/useUnreadMessageSummary";
 
 interface MessageListProps {
     onReply: (message: Message) => void;
@@ -95,8 +101,14 @@ export default function MessageList({
         conversationId: string;
     }>();
 
+    const [aiSummary, setAiSummary] =
+        useState("");
+
     const { data: currentUser } =
         useCurrentUser();
+
+    const { data: conversationsData } =
+        useConversations();
 
     const {
         data,
@@ -127,8 +139,25 @@ export default function MessageList({
         markConversationAsRead,
     } = useMarkConversationAsRead();
 
+    const {
+        mutate: summarizeUnread,
+        isPending: isSummarizingUnread,
+    } = useUnreadMessageSummary();
+
     const containerRef =
         useRef<HTMLDivElement>(null);
+
+    /*
+     * ============================================================
+     * UNREAD SNAPSHOT
+     * ============================================================
+     */
+
+    const initialUnreadCountRef =
+        useRef<number | null>(null);
+
+    const firstUnreadMessageRef =
+        useRef<string | null>(null);
 
     /*
      * ============================================================
@@ -139,38 +168,21 @@ export default function MessageList({
     const initialScrollDoneRef =
         useRef(false);
 
-    /*
-     * When true, the next message-list change
-     * is caused by pagination.
-     */
     const paginationPendingRef =
         useRef(false);
 
-    /*
-     * Used to prevent the new-message effect
-     * from running after pagination.
-     */
     const skipNextMessageScrollRef =
         useRef(false);
 
-    /*
-     * Message used as an anchor during pagination.
-     */
     const paginationAnchorRef =
         useRef<{
             messageId: string;
             top: number;
         } | null>(null);
 
-    /*
-     * Number of messages from previous render.
-     */
     const previousMessageCountRef =
         useRef(0);
 
-    /*
-     * Whether the user was near the bottom.
-     */
     const wasNearBottomRef =
         useRef(false);
 
@@ -198,7 +210,58 @@ export default function MessageList({
 
         wasNearBottomRef.current =
             false;
+
+        initialUnreadCountRef.current =
+            null;
+
+        firstUnreadMessageRef.current =
+            null;
+
+        /*
+         * Summary belongs only to this
+         * conversation-opening session.
+         */
+        setAiSummary("");
     }, [conversationId]);
+
+    /*
+     * ============================================================
+     * CAPTURE INITIAL UNREAD COUNT
+     * ============================================================
+     */
+
+    useEffect(() => {
+        if (!conversationId) {
+            return;
+        }
+
+        if (
+            initialUnreadCountRef.current !== null
+        ) {
+            return;
+        }
+
+        const conversation =
+            conversationsData?.conversations.find(
+                (conversation) =>
+                    conversation.conversationId ===
+                    conversationId
+            );
+
+        if (!conversation) {
+            return;
+        }
+
+        /*
+         * Capture the unread count before
+         * markConversationAsRead() changes it.
+         */
+        initialUnreadCountRef.current =
+            conversation.unreadCount;
+    }, [
+        conversationId,
+        conversationsData,
+    ]);
 
     /*
      * ============================================================
@@ -281,19 +344,12 @@ export default function MessageList({
         wasNearBottomRef.current =
             isNearBottom();
 
-        /*
-         * User reached the top.
-         */
         if (
             container.scrollTop <= 50 &&
             hasNextPage &&
             !isFetchingNextPage &&
             !paginationPendingRef.current
         ) {
-            /*
-             * Capture the first visible message
-             * BEFORE loading older messages.
-             */
             const anchor =
                 getFirstVisibleMessage();
 
@@ -305,12 +361,6 @@ export default function MessageList({
                 };
             }
 
-            /*
-             * Tell the rest of the component:
-             *
-             * "The next message-list update is
-             * pagination, NOT a new message."
-             */
             paginationPendingRef.current =
                 true;
 
@@ -338,10 +388,12 @@ export default function MessageList({
             return;
         }
 
-        /*
-         * Don't perform initial bottom scroll
-         * while pagination is happening.
-         */
+        if (
+            initialUnreadCountRef.current === null
+        ) {
+            return;
+        }
+
         if (
             paginationPendingRef.current
         ) {
@@ -355,6 +407,66 @@ export default function MessageList({
             if (!container) {
                 return;
             }
+
+            const unreadCount =
+                initialUnreadCountRef.current ?? 0;
+
+            /*
+             * ====================================================
+             * 5+ UNREAD
+             * ====================================================
+             *
+             * Find the first message after
+             * the previous lastReadAt.
+             */
+
+            if (
+                unreadCount >= 5
+            ) {
+                const firstUnreadMessage =
+                    messages.find(
+                        (message) =>
+                            lastReadAt &&
+                            new Date(
+                                message.createdAt
+                            ) >
+                            new Date(lastReadAt)
+                    );
+
+                if (firstUnreadMessage) {
+                    firstUnreadMessageRef.current =
+                        firstUnreadMessage.id;
+
+                    const element =
+                        document.getElementById(
+                            `message-${firstUnreadMessage.id}`
+                        );
+
+                    if (element) {
+                        element.scrollIntoView({
+                            behavior: "auto",
+                            block: "start",
+                        });
+
+                        initialScrollDoneRef.current =
+                            true;
+
+                        previousMessageCountRef.current =
+                            messages.length;
+
+                        wasNearBottomRef.current =
+                            false;
+
+                        return;
+                    }
+                }
+            }
+
+            /*
+             * ====================================================
+             * NORMAL CHAT
+             * ====================================================
+             */
 
             container.scrollTo({
                 top: container.scrollHeight,
@@ -378,35 +490,13 @@ export default function MessageList({
         data,
         conversationId,
         messages.length,
+        lastReadAt,
     ]);
 
     /*
      * ============================================================
      * RESTORE PAGINATION POSITION
      * ============================================================
-     *
-     * Instead of:
-     *
-     * oldScrollHeight -> newScrollHeight
-     *
-     * we use an actual message as an anchor.
-     *
-     * Example:
-     *
-     * Before:
-     *
-     *   Message #100  ← anchor
-     *   Message #101
-     *   Message #102
-     *
-     * Load older:
-     *
-     *   Message #50
-     *   ...
-     *   Message #100  ← same anchor
-     *
-     * We move scrollTop so #100 stays
-     * at exactly the same screen position.
      */
 
     useLayoutEffect(() => {
@@ -446,29 +536,17 @@ export default function MessageList({
         const difference =
             newTop - anchor.top;
 
-        /*
-         * Move the scroll position by exactly
-         * how much the anchor moved.
-         */
         container.scrollTop +=
             difference;
 
-        /*
-         * Pagination is now completely handled.
-         */
         paginationPendingRef.current =
             false;
 
         paginationAnchorRef.current =
             null;
 
-        /*
-         * The next message-count update should
-         * NOT be treated as a new message.
-         */
         previousMessageCountRef.current =
             messages.length;
-
     }, [
         messages.length,
     ]);
@@ -490,11 +568,6 @@ export default function MessageList({
         const currentCount =
             messages.length;
 
-        /*
-         * Pagination happened.
-         *
-         * NEVER scroll to bottom.
-         */
         if (
             skipNextMessageScrollRef.current
         ) {
@@ -507,9 +580,6 @@ export default function MessageList({
             return;
         }
 
-        /*
-         * New real-time message.
-         */
         if (
             currentCount >
             previousCount &&
@@ -591,19 +661,12 @@ export default function MessageList({
                 return;
             }
 
-            /*
-             * Never interfere with pagination.
-             */
             if (
                 paginationPendingRef.current
             ) {
                 return;
             }
 
-            /*
-             * If user is reading older messages,
-             * don't throw them to the bottom.
-             */
             if (
                 !wasNearBottomRef.current &&
                 !isNearBottom()
@@ -829,6 +892,10 @@ export default function MessageList({
                             )
                         );
 
+                    const isFirstUnread =
+                        firstUnreadMessageRef.current ===
+                        message.id;
+
                     return (
                         <div
                             key={message.id}
@@ -843,6 +910,113 @@ export default function MessageList({
                                     </div>
                                 </div>
                             )}
+
+                            {isFirstUnread &&
+                                initialUnreadCountRef.current !== null &&
+                                initialUnreadCountRef.current >= 5 && (
+                                    <div className="my-1">
+                                        {!aiSummary && (
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    if (
+                                                        isSummarizingUnread
+                                                    ) {
+                                                        return;
+                                                    }
+
+                                                    setAiSummary("");
+
+                                                    summarizeUnread(
+                                                        {
+                                                            conversationId,
+                                                            onChunk:
+                                                                (
+                                                                    chunk
+                                                                ) => {
+                                                                    setAiSummary(
+                                                                        (
+                                                                            prev
+                                                                        ) =>
+                                                                            prev +
+                                                                            chunk
+                                                                    );
+                                                                },
+                                                        }
+                                                    );
+                                                }}
+                                                disabled={
+                                                    isSummarizingUnread
+                                                }
+                                                className="
+                                                    flex
+                                                    w-full
+                                                    items-center
+                                                    justify-center
+                                                    gap-2
+                                                    rounded-xl
+                                                    border
+                                                    border-sky-500/20
+                                                    bg-sky-500/5
+                                                    px-4
+                                                    py-2.5
+                                                    text-sm
+                                                    font-medium
+                                                    text-sky-400
+                                                    transition
+                                                    hover:border-sky-500/40
+                                                    hover:bg-sky-500/10
+                                                    disabled:cursor-not-allowed
+                                                    disabled:opacity-40
+                                                "
+                                            >
+                                                {isSummarizingUnread ? (
+                                                    "Summarizing..."
+                                                ) : (
+                                                    <>
+                                                        <Sparkles className="h-4 w-4" />
+
+                                                        Summarize{" "}
+                                                        {
+                                                            initialUnreadCountRef.current
+                                                        }{" "}
+                                                        messages with AI
+                                                    </>
+                                                )}
+                                            </button>
+                                        )}
+
+                                        {aiSummary && (
+                                            <div className="mt-2 rounded-xl border border-sky-500/20 bg-sky-500/5 p-4">
+                                                <div className="mb-2 flex items-center gap-2">
+                                                    <Sparkles className="h-4 w-4 text-sky-400" />
+
+                                                    <span className="text-sm font-semibold text-sky-400">
+                                                        AI Summary
+                                                    </span>
+
+                                                    {isSummarizingUnread && (
+                                                        <span className="text-xs text-slate-500">
+                                                            generating...
+                                                        </span>
+                                                    )}
+                                                </div>
+
+                                                <p className="whitespace-pre-wrap text-sm leading-6 text-slate-300">
+                                                    {
+                                                        aiSummary
+                                                    }
+
+                                                    {isSummarizingUnread && (
+                                                        <span className="ml-1 animate-pulse">
+                                                            ▌
+                                                        </span>
+                                                    )}
+                                                </p>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
 
                             <MessageBubble
                                 message={message}

@@ -7,8 +7,6 @@ import {
 } from "lucide-react";
 
 import { useAskAI } from "@/hooks/ai/useAskAI";
-import { useUnreadMessageCount } from "@/hooks/ai/useUnreadMessageCount";
-import { useUnreadMessageSummary } from "@/hooks/ai/useUnreadMessageSummary";
 
 type AIAssistantProps = {
     conversationId: string;
@@ -37,7 +35,6 @@ export default function AIAssistant({
 }: AIAssistantProps) {
     const [prompt, setPrompt] = useState("");
     const [response, setResponse] = useState("");
-    const [isUnreadSummary, setIsUnreadSummary] = useState(false);
 
     const {
         mutate,
@@ -47,30 +44,13 @@ export default function AIAssistant({
         reset,
     } = useAskAI();
 
-    const {
-        data: unreadSummary,
-        isLoading: isUnreadCountLoading,
-    } = useUnreadMessageCount(
-        conversationId
-    );
-
-    const {
-        mutate: summarizeUnread,
-        isPending: isSummarizingUnread,
-        isError: isUnreadSummaryError,
-        error: unreadSummaryError,
-    } = useUnreadMessageSummary();
-
-    const isAIWorking =
-        isPending || isSummarizingUnread;
-
     const askPrompt = (value: string) => {
         const trimmedPrompt =
             value.trim();
 
         if (
             !trimmedPrompt ||
-            isAIWorking
+            isPending
         ) {
             return;
         }
@@ -96,27 +76,7 @@ export default function AIAssistant({
         askPrompt(prompt);
     };
 
-    const handleUnreadSummary = () => {
-        if (isAIWorking) {
-            return;
-        }
-
-        reset();
-        setResponse("");
-        setIsUnreadSummary(true);
-
-        summarizeUnread({
-            conversationId,
-
-            onChunk: (chunk) => {
-                setResponse(
-                    (prev) => prev + chunk
-                );
-            },
-        });
-    };
-
-    const normalErrorMessage =
+    const errorMessage =
         (
             error as {
                 response?: {
@@ -128,10 +88,6 @@ export default function AIAssistant({
         )?.response?.data?.message ??
         error?.message ??
         "Failed to get an AI response.";
-
-    const unreadSummaryErrorMessage =
-        unreadSummaryError?.message ??
-        "Failed to generate unread summary.";
 
     return (
         <div
@@ -223,84 +179,6 @@ export default function AIAssistant({
                 </p>
             </div>
 
-            {/* Unread Summary */}
-
-            {!isUnreadCountLoading &&
-                unreadSummary?.hasEnoughUnreadMessages && (
-                    <button
-                        type="button"
-                        onClick={
-                            handleUnreadSummary
-                        }
-                        disabled={isAIWorking}
-                        className="
-                            mb-3
-                            flex
-                            w-full
-                            items-center
-                            gap-3
-                            rounded-xl
-                            border
-                            border-sky-500/20
-                            bg-sky-500/5
-                            p-3
-                            text-left
-                            transition
-                            hover:border-sky-500/40
-                            hover:bg-sky-500/10
-                            disabled:cursor-not-allowed
-                            disabled:opacity-40
-                        "
-                    >
-                        {isSummarizingUnread ? (
-                            <Loader2
-                                className="
-                                    h-4
-                                    w-4
-                                    shrink-0
-                                    animate-spin
-                                    text-sky-400
-                                "
-                            />
-                        ) : (
-                            <Sparkles
-                                className="
-                                    h-4
-                                    w-4
-                                    shrink-0
-                                    text-sky-400
-                                "
-                            />
-                        )}
-
-                        <div className="min-w-0">
-                            <p
-                                className="
-                                    text-sm
-                                    font-medium
-                                    text-sky-400
-                                "
-                            >
-                                {isSummarizingUnread
-                                    ? "Summarizing..."
-                                    : "Catch up on this conversation"}
-                            </p>
-
-                            <p
-                                className="
-                                    text-xs
-                                    text-slate-500
-                                "
-                            >
-                                {
-                                    unreadSummary.count
-                                }{" "}
-                                unread messages
-                            </p>
-                        </div>
-                    </button>
-                )}
-
             {/* Quick Actions */}
 
             <div
@@ -321,7 +199,7 @@ export default function AIAssistant({
                                     action.prompt
                                 )
                             }
-                            disabled={isAIWorking}
+                            disabled={isPending}
                             className="
                                 rounded-lg
                                 border
@@ -354,7 +232,7 @@ export default function AIAssistant({
                 }
                 placeholder="Ask something about this chat..."
                 rows={3}
-                disabled={isAIWorking}
+                disabled={isPending}
                 className="
                     w-full
                     resize-none
@@ -380,7 +258,7 @@ export default function AIAssistant({
                 onClick={handleAsk}
                 disabled={
                     !prompt.trim() ||
-                    isAIWorking
+                    isPending
                 }
                 className="
                     mt-3
@@ -423,12 +301,11 @@ export default function AIAssistant({
                 )}
             </button>
 
-            {/* Errors */}
+            {/* Error */}
 
-            {(isError ||
-                isUnreadSummaryError) && (
-                    <div
-                        className="
+            {isError && (
+                <div
+                    className="
                         mt-3
                         rounded-lg
                         border
@@ -436,20 +313,18 @@ export default function AIAssistant({
                         bg-red-500/5
                         p-3
                     "
-                    >
-                        <p
-                            className="
+                >
+                    <p
+                        className="
                             text-xs
                             leading-5
                             text-red-400
                         "
-                        >
-                            {isUnreadSummaryError
-                                ? unreadSummaryErrorMessage
-                                : normalErrorMessage}
-                        </p>
-                    </div>
-                )}
+                    >
+                        {errorMessage}
+                    </p>
+                </div>
+            )}
 
             {/* Streaming Response */}
 
@@ -480,13 +355,17 @@ export default function AIAssistant({
                             "
                         />
 
-                        <span className="text-xs font-semibold text-sky-400">
-                            {isUnreadSummary
-                                ? "What you missed"
-                                : "Relay AI"}
+                        <span
+                            className="
+                                text-xs
+                                font-semibold
+                                text-sky-400
+                            "
+                        >
+                            Relay AI
                         </span>
 
-                        {isAIWorking && (
+                        {isPending && (
                             <span
                                 className="
                                     text-xs
@@ -508,7 +387,7 @@ export default function AIAssistant({
                     >
                         {response}
 
-                        {isAIWorking && (
+                        {isPending && (
                             <span
                                 className="
                                     ml-1
