@@ -329,63 +329,37 @@ export default function MessageList({
      */
 
     useEffect(() => {
-        if (
-            !conversationId ||
-            !data
-        ) {
+        if (!conversationId || !data) {
             return;
         }
 
-        if (
-            unreadSnapshotCapturedRef.current
-        ) {
+        if (unreadSnapshotCapturedRef.current) {
             return;
         }
 
-        /*
-         * The first page contains the current read boundary.
-         */
         const originalLastReadAt =
-            data.pages[0]
-                ?.lastReadAt ?? null;
+            data.pages[0]?.lastReadAt ?? null;
 
-        const readTime =
-            originalLastReadAt
-                ? new Date(
-                    originalLastReadAt
-                ).getTime()
-                : 0;
+        const readTime = originalLastReadAt
+            ? new Date(originalLastReadAt).getTime()
+            : 0;
 
-        /*
-         * Use the messages currently loaded in the initial
-         * query to determine how many unread messages exist.
-         */
-        const unreadMessages =
-            messages.filter(
-                (message) =>
-                    new Date(
-                        message.createdAt
-                    ).getTime() >
-                    readTime
-            );
-
-        /*
-         * Freeze the snapshot.
-         */
-        unreadSnapshotCapturedRef.current =
-            true;
-
-        setInitialLastReadAt(
-            originalLastReadAt
+        const unreadMessages = messages.filter(
+            (message) =>
+                new Date(message.createdAt).getTime() >
+                readTime
         );
 
-        setInitialUnreadCount(
-            unreadMessages.length
-        );
-    }, [
-        conversationId,
-        data,
-    ]);
+        // Freeze the original unread state.
+        unreadSnapshotCapturedRef.current = true;
+
+        setInitialLastReadAt(originalLastReadAt);
+        setInitialUnreadCount(unreadMessages.length);
+
+        // IMPORTANT: remember the first unread message.
+        firstUnreadMessageIdRef.current =
+            unreadMessages[0]?.id ?? null;
+    }, [conversationId, data, messages]);
 
     /*
      * ============================================================
@@ -462,71 +436,20 @@ export default function MessageList({
 
     const getFirstUnreadMessage =
         useCallback((): Message | null => {
-            if (
-                initialUnreadCount === null ||
-                initialUnreadCount <= 0 ||
-                messages.length === 0
-            ) {
+            const firstUnreadId =
+                firstUnreadMessageIdRef.current;
+
+            if (!firstUnreadId) {
                 return null;
             }
 
-            /*
-             * Preferred method:
-             *
-             * Find the first message after the frozen
-             * lastReadAt timestamp.
-             */
-            if (initialLastReadAt) {
-                const readTime =
-                    new Date(
-                        initialLastReadAt
-                    ).getTime();
-
-                const firstUnread =
-                    messages.find(
-                        (message) =>
-                            new Date(
-                                message.createdAt
-                            ).getTime() >
-                            readTime
-                    );
-
-                if (firstUnread) {
-                    return firstUnread;
-                }
-            }
-
-            /*
-             * Fallback when there is no lastReadAt.
-             *
-             * Only use this when all unread messages are
-             * currently loaded.
-             */
-            if (
-                initialUnreadCount <=
-                messages.length
-            ) {
-                const firstUnreadIndex =
-                    messages.length -
-                    initialUnreadCount;
-
-                return (
-                    messages[
-                    firstUnreadIndex
-                    ] ?? null
-                );
-            }
-
-            /*
-             * More unread messages exist than we currently
-             * have loaded.
-             */
-            return null;
-        }, [
-            messages,
-            initialUnreadCount,
-            initialLastReadAt,
-        ]);
+            return (
+                messages.find(
+                    (message) =>
+                        message.id === firstUnreadId
+                ) ?? null
+            );
+        }, [messages]);
 
     /*
      * ============================================================
@@ -1157,12 +1080,7 @@ export default function MessageList({
 
     const firstUnreadMessage =
         getFirstUnreadMessage();
-
-    if (firstUnreadMessage) {
-        firstUnreadMessageIdRef.current =
-            firstUnreadMessage.id;
-    }
-
+        
     /*
      * ============================================================
      * RENDER
