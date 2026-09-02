@@ -136,16 +136,27 @@ export async function unreadMessageSummaryController(
         const prompt = `
                         Summarize the unread messages from this conversation.
 
-                        Include:
-                        - Main topics discussed
-                        - Important decisions
-                        - Action items, if any
+                        Format the response exactly in this structure:
 
-                        Keep the summary concise and easy to read.
-                        Use short headings and bullet points.
+                        Summary
+                        - Write 2 to 4 concise bullet points covering the main topics,
+                        important updates, and decisions.
 
-                        Only use information present in the messages.
-                        Do not invent or assume information.
+                        Action items
+                        - Include this section only when there are clear tasks or responsibilities.
+                        - Format each item as:
+                        Person - Task
+
+                        Rules:
+                        - Keep the response concise and easy to scan.
+                        - Use short, natural sentences.
+                        - Only use information explicitly present in the messages.
+                        - Do not invent, assume, or infer missing information.
+                        - Do not repeat messages word-for-word.
+                        - Do not include an introduction such as "Here is a summary".
+                        - Do not include a conclusion.
+                        - Do not mention that you are an AI.
+                        - If there are no clear action items, omit the Action items section.
                         `;
 
         const stream = await askAI(

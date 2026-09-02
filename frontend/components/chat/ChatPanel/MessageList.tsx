@@ -5,6 +5,7 @@ import {
     useLayoutEffect,
     useRef,
     useState,
+    useCallback,
 } from "react";
 import { useParams } from "next/navigation";
 
@@ -32,11 +33,17 @@ interface MessageListProps {
     ) => void;
 }
 
-function isSameDay(first: Date, second: Date) {
+function isSameDay(
+    first: Date,
+    second: Date
+) {
     return (
-        first.getFullYear() === second.getFullYear() &&
-        first.getMonth() === second.getMonth() &&
-        first.getDate() === second.getDate()
+        first.getFullYear() ===
+        second.getFullYear() &&
+        first.getMonth() ===
+        second.getMonth() &&
+        first.getDate() ===
+        second.getDate()
     );
 }
 
@@ -49,7 +56,8 @@ function startOfWeek(date: Date) {
         day === 0 ? 6 : day - 1;
 
     result.setDate(
-        result.getDate() - daysFromMonday
+        result.getDate() -
+        daysFromMonday
     );
 
     result.setHours(0, 0, 0, 0);
@@ -57,7 +65,9 @@ function startOfWeek(date: Date) {
     return result;
 }
 
-function formatMessageDate(dateString: string) {
+function formatMessageDate(
+    dateString: string
+) {
     const date = new Date(dateString);
     const now = new Date();
 
@@ -71,23 +81,35 @@ function formatMessageDate(dateString: string) {
         yesterday.getDate() - 1
     );
 
-    if (isSameDay(date, yesterday)) {
+    if (
+        isSameDay(
+            date,
+            yesterday
+        )
+    ) {
         return "Yesterday";
     }
 
-    const weekStart = startOfWeek(now);
+    const weekStart =
+        startOfWeek(now);
 
     if (date >= weekStart) {
-        return date.toLocaleDateString("en-IN", {
-            weekday: "long",
-        });
+        return date.toLocaleDateString(
+            "en-IN",
+            {
+                weekday: "long",
+            }
+        );
     }
 
-    return date.toLocaleDateString("en-IN", {
-        day: "numeric",
-        month: "long",
-        year: "numeric",
-    });
+    return date.toLocaleDateString(
+        "en-IN",
+        {
+            day: "numeric",
+            month: "long",
+            year: "numeric",
+        }
+    );
 }
 
 export default function MessageList({
@@ -96,18 +118,24 @@ export default function MessageList({
     highlightedMessageId,
     setHighlightedMessageId,
 }: MessageListProps) {
-    const { conversationId } = useParams<{
+    const {
+        conversationId,
+    } = useParams<{
         conversationId: string;
     }>();
 
-    const [aiSummary, setAiSummary] =
-        useState("");
+    const [
+        aiSummary,
+        setAiSummary,
+    ] = useState("");
 
-    const { data: currentUser } =
-        useCurrentUser();
+    const {
+        data: currentUser,
+    } = useCurrentUser();
 
-    const { data: conversationsData } =
-        useConversations();
+    const {
+        data: conversationsData,
+    } = useConversations();
 
     const {
         data,
@@ -116,21 +144,31 @@ export default function MessageList({
         fetchNextPage,
         hasNextPage,
         isFetchingNextPage,
-    } = useMessages(conversationId);
+    } = useMessages(
+        conversationId
+    );
 
     const messages =
         data?.pages
             .slice()
             .reverse()
             .flatMap(
-                (page) => page.messages
+                (page) =>
+                    page.messages
             ) ?? [];
 
     /*
-     * This is the live value used by MessageBubble.
+     * Live lastReadAt.
+     *
+     * This is intentionally used only for
+     * MessageBubble/read receipts.
+     *
+     * The unread-summary feature uses the
+     * frozen initialLastReadAtRef instead.
      */
     const lastReadAt =
-        data?.pages[0]?.lastReadAt ?? null;
+        data?.pages[0]
+            ?.lastReadAt ?? null;
 
     const {
         isConnected,
@@ -138,34 +176,52 @@ export default function MessageList({
 
     const {
         markConversationAsRead,
-    } = useMarkConversationAsRead();
+    } =
+        useMarkConversationAsRead();
 
     const {
         mutate: summarizeUnread,
-        isPending: isSummarizingUnread,
-        isError: isSummaryError,
+        isPending:
+        isSummarizingUnread,
+        isError:
+        isSummaryError,
         error: summaryError,
-    } = useUnreadMessageSummary();
+    } =
+        useUnreadMessageSummary();
 
     const containerRef =
-        useRef<HTMLDivElement>(null);
+        useRef<HTMLDivElement>(
+            null
+        );
 
     /*
      * ============================================================
-     * ORIGINAL UNREAD SNAPSHOT
+     * UNREAD SNAPSHOT
      * ============================================================
      *
-     * These MUST NOT change after markConversationAsRead().
+     * These values represent the state when the conversation
+     * was opened.
+     *
+     * They MUST NOT change after markConversationAsRead().
      */
 
     const initialUnreadCountRef =
-        useRef<number | null>(null);
+        useRef<number | null>(
+            null
+        );
 
     const initialLastReadAtRef =
-        useRef<string | null>(null);
+        useRef<string | null>(
+            null
+        );
 
-    const firstUnreadMessageRef =
-        useRef<string | null>(null);
+    const unreadSnapshotCapturedRef =
+        useRef(false);
+
+    const firstUnreadMessageIdRef =
+        useRef<string | null>(
+            null
+        );
 
     /*
      * ============================================================
@@ -196,7 +252,7 @@ export default function MessageList({
 
     /*
      * ============================================================
-     * RESET
+     * RESET WHEN SWITCHING CONVERSATION
      * ============================================================
      */
 
@@ -225,7 +281,10 @@ export default function MessageList({
         initialLastReadAtRef.current =
             null;
 
-        firstUnreadMessageRef.current =
+        unreadSnapshotCapturedRef.current =
+            false;
+
+        firstUnreadMessageIdRef.current =
             null;
 
         setAiSummary("");
@@ -235,10 +294,22 @@ export default function MessageList({
      * ============================================================
      * CAPTURE ORIGINAL UNREAD STATE
      * ============================================================
+     *
+     * This effect appears BEFORE the mark-as-read effect below.
+     *
+     * React runs effects in declaration order, so when both
+     * pieces of data are available, the original unread state
+     * is frozen before markConversationAsRead() can update it.
      */
 
     useEffect(() => {
         if (!conversationId) {
+            return;
+        }
+
+        if (
+            unreadSnapshotCapturedRef.current
+        ) {
             return;
         }
 
@@ -250,31 +321,34 @@ export default function MessageList({
             );
 
         /*
-         * Capture unread count BEFORE it becomes 0.
+         * Wait until both the conversation and
+         * message response are available.
          */
         if (
-            conversation &&
-            initialUnreadCountRef.current === null
+            !conversation ||
+            !data
         ) {
-            initialUnreadCountRef.current =
-                conversation.unreadCount;
+            return;
         }
 
+        initialUnreadCountRef.current =
+            conversation.unreadCount;
+
         /*
-         * Capture lastReadAt from the first
-         * message response BEFORE mark-as-read
-         * changes it.
+         * This is the original lastReadAt from
+         * the initial message response.
+         *
+         * It is allowed to be null.
          */
-        if (
-            initialLastReadAtRef.current === null &&
-            lastReadAt !== null
-        ) {
-            initialLastReadAtRef.current =
-                lastReadAt;
-        }
+        initialLastReadAtRef.current =
+            lastReadAt;
+
+        unreadSnapshotCapturedRef.current =
+            true;
     }, [
         conversationId,
         conversationsData,
+        data,
         lastReadAt,
     ]);
 
@@ -284,119 +358,133 @@ export default function MessageList({
      * ============================================================
      */
 
-    function isNearBottom() {
-        const container =
-            containerRef.current;
+    const isNearBottom =
+        useCallback(() => {
+            const container =
+                containerRef.current;
 
-        if (!container) {
-            return false;
-        }
-
-        const distance =
-            container.scrollHeight -
-            container.scrollTop -
-            container.clientHeight;
-
-        return distance <= 120;
-    }
-
-    function getFirstVisibleMessage() {
-        const container =
-            containerRef.current;
-
-        if (!container) {
-            return null;
-        }
-
-        const messageElements =
-            container.querySelectorAll<HTMLElement>(
-                '[id^="message-"]'
-            );
-
-        const containerTop =
-            container.getBoundingClientRect().top;
-
-        for (
-            const element of messageElements
-        ) {
-            const rect =
-                element.getBoundingClientRect();
-
-            if (
-                rect.bottom >
-                containerTop
-            ) {
-                return {
-                    messageId:
-                        element.id.replace(
-                            "message-",
-                            ""
-                        ),
-                    top: rect.top,
-                };
+            if (!container) {
+                return false;
             }
-        }
 
-        return null;
-    }
+            const distance =
+                container.scrollHeight -
+                container.scrollTop -
+                container.clientHeight;
+
+            return distance <= 120;
+        }, []);
+
+    const getFirstVisibleMessage =
+        useCallback(() => {
+            const container =
+                containerRef.current;
+
+            if (!container) {
+                return null;
+            }
+
+            const messageElements =
+                container.querySelectorAll<HTMLElement>(
+                    '[id^="message-"]'
+                );
+
+            const containerTop =
+                container
+                    .getBoundingClientRect()
+                    .top;
+
+            for (
+                const element of messageElements
+            ) {
+                const rect =
+                    element.getBoundingClientRect();
+
+                if (
+                    rect.bottom >
+                    containerTop
+                ) {
+                    return {
+                        messageId:
+                            element.id.replace(
+                                "message-",
+                                ""
+                            ),
+                        top: rect.top,
+                    };
+                }
+            }
+
+            return null;
+        }, []);
 
     /*
      * ============================================================
-     * FIRST UNREAD MESSAGE
+     * FIND FIRST UNREAD MESSAGE
      * ============================================================
      */
 
-    function getFirstUnreadMessage() {
-        const unreadCount =
-            initialUnreadCountRef.current;
+    const getFirstUnreadMessage =
+        useCallback((): Message | null => {
+            const unreadCount =
+                initialUnreadCountRef.current;
 
-        if (
-            unreadCount === null ||
-            unreadCount < 5
-        ) {
-            return null;
-        }
+            if (
+                unreadCount === null ||
+                unreadCount < 5 ||
+                messages.length === 0
+            ) {
+                return null;
+            }
 
-        const originalLastReadAt =
-            initialLastReadAtRef.current;
+            /*
+             * Best case:
+             *
+             * Use the ORIGINAL lastReadAt.
+             *
+             * Do not use the live lastReadAt because
+             * it may already have been changed to now.
+             */
+            const originalLastReadAt =
+                initialLastReadAtRef.current;
 
-        /*
-         * Best case:
-         * use the original lastReadAt.
-         */
-        if (originalLastReadAt) {
-            const readTime =
-                new Date(
-                    originalLastReadAt
-                ).getTime();
+            if (originalLastReadAt) {
+                const readTime =
+                    new Date(
+                        originalLastReadAt
+                    ).getTime();
+
+                const firstUnread =
+                    messages.find(
+                        (message) =>
+                            new Date(
+                                message.createdAt
+                            ).getTime() >
+                            readTime
+                    );
+
+                if (firstUnread) {
+                    return firstUnread;
+                }
+            }
+
+            /*
+             * If there was no previous lastReadAt,
+             * use the initial unread count.
+             */
+            const firstUnreadIndex =
+                Math.max(
+                    0,
+                    messages.length -
+                    unreadCount
+                );
 
             return (
-                messages.find(
-                    (message) =>
-                        new Date(
-                            message.createdAt
-                        ).getTime() >
-                        readTime
-                ) ?? null
+                messages[
+                firstUnreadIndex
+                ] ?? null
             );
-        }
-
-        /*
-         * If there was no previous read timestamp,
-         * calculate from the unread count.
-         */
-        const firstUnreadIndex =
-            Math.max(
-                0,
-                messages.length -
-                    unreadCount
-            );
-
-        return (
-            messages[firstUnreadIndex] ??
-            null
-        );
-    }
+        }, [messages]);
 
     /*
      * ============================================================
@@ -425,11 +513,8 @@ export default function MessageList({
                 getFirstVisibleMessage();
 
             if (anchor) {
-                paginationAnchorRef.current = {
-                    messageId:
-                        anchor.messageId,
-                    top: anchor.top,
-                };
+                paginationAnchorRef.current =
+                    anchor;
             }
 
             paginationPendingRef.current =
@@ -446,6 +531,14 @@ export default function MessageList({
      * ============================================================
      * INITIAL SCROLL
      * ============================================================
+     *
+     * If 5+ messages were unread:
+     *
+     *      [Unread divider]
+     *      [AI summary button]
+     *      [First unread message]
+     *
+     * The summary block is used as the actual scroll anchor.
      */
 
     useEffect(() => {
@@ -455,6 +548,12 @@ export default function MessageList({
 
         if (
             initialScrollDoneRef.current
+        ) {
+            return;
+        }
+
+        if (
+            !unreadSnapshotCapturedRef.current
         ) {
             return;
         }
@@ -485,24 +584,49 @@ export default function MessageList({
                     initialUnreadCountRef.current ??
                     0;
 
-                if (unreadCount >= 5) {
+                if (
+                    unreadCount >= 5
+                ) {
                     const firstUnread =
                         getFirstUnreadMessage();
 
                     if (firstUnread) {
-                        firstUnreadMessageRef.current =
+                        firstUnreadMessageIdRef.current =
                             firstUnread.id;
 
-                        const element =
+                        const anchor =
                             document.getElementById(
-                                `message-${firstUnread.id}`
+                                "unread-summary-anchor"
                             );
 
-                        if (element) {
-                            element.scrollIntoView({
-                                behavior:
-                                    "auto",
-                                block: "start",
+                        if (anchor) {
+                            /*
+                             * Calculate position relative to
+                             * the message container.
+                             *
+                             * This avoids scrollIntoView()
+                             * moving the wrong ancestor.
+                             */
+                            const containerRect =
+                                container.getBoundingClientRect();
+
+                            const anchorRect =
+                                anchor.getBoundingClientRect();
+
+                            const targetScrollTop =
+                                container.scrollTop +
+                                (
+                                    anchorRect.top -
+                                    containerRect.top
+                                ) -
+                                12;
+
+                            container.scrollTo({
+                                top: Math.max(
+                                    0,
+                                    targetScrollTop
+                                ),
+                                behavior: "auto",
                             });
 
                             initialScrollDoneRef.current =
@@ -519,6 +643,10 @@ export default function MessageList({
                     }
                 }
 
+                /*
+                 * Normal conversation:
+                 * open at the latest message.
+                 */
                 container.scrollTo({
                     top:
                         container.scrollHeight,
@@ -540,10 +668,8 @@ export default function MessageList({
         };
     }, [
         data,
-        conversationId,
         messages.length,
-        initialUnreadCountRef.current,
-        initialLastReadAtRef.current,
+        getFirstUnreadMessage,
     ]);
 
     /*
@@ -600,9 +726,7 @@ export default function MessageList({
 
         previousMessageCountRef.current =
             messages.length;
-    }, [
-        messages.length,
-    ]);
+    }, [messages.length]);
 
     /*
      * ============================================================
@@ -621,6 +745,10 @@ export default function MessageList({
         const currentCount =
             messages.length;
 
+        /*
+         * Ignore the count increase caused by
+         * loading older messages.
+         */
         if (
             skipNextMessageScrollRef.current
         ) {
@@ -633,10 +761,15 @@ export default function MessageList({
             return;
         }
 
+        /*
+         * Only scroll to bottom for a genuinely new
+         * message when the user was already near bottom.
+         */
         if (
             currentCount >
-                previousCount &&
-            previousCount !== 0
+            previousCount &&
+            previousCount !== 0 &&
+            wasNearBottomRef.current
         ) {
             const container =
                 containerRef.current;
@@ -648,9 +781,6 @@ export default function MessageList({
                     behavior: "smooth",
                 });
             }
-
-            wasNearBottomRef.current =
-                true;
         }
 
         previousMessageCountRef.current =
@@ -670,11 +800,8 @@ export default function MessageList({
         messages.at(-1);
 
     useEffect(() => {
-        if (!isConnected) {
-            return;
-        }
-
         if (
+            !isConnected ||
             !conversationId ||
             !currentUser ||
             !lastMessage
@@ -682,6 +809,9 @@ export default function MessageList({
             return;
         }
 
+        /*
+         * Don't mark your own messages as read.
+         */
         if (
             lastMessage.sender.id ===
             currentUser.user.id
@@ -746,7 +876,7 @@ export default function MessageList({
                 handleImageLoaded
             );
         };
-    }, []);
+    }, [isNearBottom]);
 
     /*
      * ============================================================
@@ -794,11 +924,8 @@ export default function MessageList({
                 getFirstVisibleMessage();
 
             if (anchor) {
-                paginationAnchorRef.current = {
-                    messageId:
-                        anchor.messageId,
-                    top: anchor.top,
-                };
+                paginationAnchorRef.current =
+                    anchor;
             }
 
             paginationPendingRef.current =
@@ -811,11 +938,11 @@ export default function MessageList({
         }
     }, [
         jumpToMessageId,
-        messages.length,
         hasNextPage,
         isFetchingNextPage,
         fetchNextPage,
         setHighlightedMessageId,
+        getFirstVisibleMessage,
     ]);
 
     /*
@@ -907,6 +1034,21 @@ export default function MessageList({
         getFirstUnreadMessage();
 
     /*
+     * Keep the ref synchronized with the
+     * currently resolved first unread message.
+     */
+    if (
+        firstUnreadMessage &&
+        (
+            initialUnreadCountRef.current ??
+            0
+        ) >= 5
+    ) {
+        firstUnreadMessageIdRef.current =
+            firstUnreadMessage.id;
+    }
+
+    /*
      * ============================================================
      * RENDER
      * ============================================================
@@ -940,7 +1082,9 @@ export default function MessageList({
             {messages.map(
                 (message, index) => {
                     const previousMessage =
-                        messages[index - 1];
+                        messages[
+                        index - 1
+                        ];
 
                     const messageDate =
                         new Date(
@@ -960,10 +1104,21 @@ export default function MessageList({
                         firstUnreadMessage?.id ===
                         message.id;
 
+                    const shouldShowUnreadSummary =
+                        isFirstUnread &&
+                        (
+                            initialUnreadCountRef.current ??
+                            0
+                        ) >= 5;
+
                     return (
                         <div
                             key={message.id}
-                            className="flex flex-col gap-3"
+                            className="
+                                flex
+                                flex-col
+                                gap-3
+                            "
                         >
                             {showDateSeparator && (
                                 <div className="flex justify-center py-2">
@@ -975,18 +1130,34 @@ export default function MessageList({
                                 </div>
                             )}
 
-                            {isFirstUnread &&
-                                initialUnreadCountRef.current !==
-                                    null &&
-                                initialUnreadCountRef.current >=
-                                    5 && (
-                                    <div className="w-full">
-                                        {!aiSummary && (
+                            {shouldShowUnreadSummary && (
+                                <div
+                                    id="unread-summary-anchor"
+                                    className="
+                                        my-1
+                                        w-full
+                                        scroll-mt-3
+                                    "
+                                >
+                                    {/* Unread divider + AI action */}
+                                    {!aiSummary && (
+                                        <div className="flex items-center gap-3">
+                                            <div className="h-px flex-1 bg-sky-500/20" />
+
+                                            <span
+                                                className="
+                                                    shrink-0
+                                                    text-xs
+                                                    font-medium
+                                                    text-sky-400
+                                                "
+                                            >
+                                                {initialUnreadCountRef.current} new messages
+                                            </span>
+
                                             <button
                                                 type="button"
-                                                disabled={
-                                                    isSummarizingUnread
-                                                }
+                                                disabled={isSummarizingUnread}
                                                 onClick={() => {
                                                     if (
                                                         isSummarizingUnread ||
@@ -995,20 +1166,11 @@ export default function MessageList({
                                                         return;
                                                     }
 
-                                                    /*
-                                                     * Important:
-                                                     * send a timestamp immediately
-                                                     * BEFORE the first unread message.
-                                                     *
-                                                     * Backend will use this instead
-                                                     * of the now-updated lastReadAt.
-                                                     */
                                                     const unreadSince =
                                                         new Date(
                                                             new Date(
                                                                 firstUnreadMessage.createdAt
-                                                            ).getTime() -
-                                                                1
+                                                            ).getTime() - 1
                                                         ).toISOString();
 
                                                     setAiSummary("");
@@ -1016,33 +1178,26 @@ export default function MessageList({
                                                     summarizeUnread({
                                                         conversationId,
                                                         unreadSince,
-                                                        onChunk:
-                                                            (
-                                                                chunk
-                                                            ) => {
-                                                                setAiSummary(
-                                                                    (
-                                                                        previous
-                                                                    ) =>
-                                                                        previous +
-                                                                        chunk
-                                                                );
-                                                            },
+                                                        onChunk: (chunk) => {
+                                                            setAiSummary(
+                                                                (previous) =>
+                                                                    previous + chunk
+                                                            );
+                                                        },
                                                     });
                                                 }}
                                                 className="
                                                     flex
-                                                    w-full
+                                                    shrink-0
                                                     items-center
-                                                    justify-center
-                                                    gap-2
-                                                    rounded-xl
+                                                    gap-1.5
+                                                    rounded-lg
                                                     border
                                                     border-sky-500/20
                                                     bg-sky-500/5
-                                                    px-4
-                                                    py-2.5
-                                                    text-sm
+                                                    px-2.5
+                                                    py-1.5
+                                                    text-xs
                                                     font-medium
                                                     text-sky-400
                                                     transition
@@ -1052,63 +1207,69 @@ export default function MessageList({
                                                     disabled:opacity-40
                                                 "
                                             >
-                                                <Sparkles className="h-4 w-4" />
+                                                <Sparkles className="h-3.5 w-3.5" />
 
                                                 {isSummarizingUnread
                                                     ? "Summarizing..."
-                                                    : `Summarize ${initialUnreadCountRef.current} messages with AI`}
+                                                    : "Summarize with AI"}
                                             </button>
-                                        )}
 
-                                        {aiSummary && (
-                                            <div className="mt-2 rounded-xl border border-sky-500/20 bg-sky-500/5 p-4">
-                                                <div className="mb-2 flex items-center gap-2">
-                                                    <Sparkles className="h-4 w-4 text-sky-400" />
+                                            <div className="h-px flex-1 bg-sky-500/20" />
+                                        </div>
+                                    )}
 
-                                                    <span className="text-sm font-semibold text-sky-400">
-                                                        AI Summary
-                                                    </span>
-
-                                                    {isSummarizingUnread && (
-                                                        <span className="text-xs text-slate-500">
-                                                            generating...
-                                                        </span>
-                                                    )}
+                                    {/* AI Summary */}
+                                    {aiSummary && (
+                                        <div className="mt-2 w-full rounded-xl border border-sky-500/15 bg-sky-500/[0.04] px-4 py-3">
+                                            <div className="mb-2 flex items-center gap-2">
+                                                <div className="flex h-6 w-6 items-center justify-center rounded-md bg-sky-500/10">
+                                                    <Sparkles className="h-3.5 w-3.5 text-sky-400" />
                                                 </div>
 
-                                                <p className="whitespace-pre-wrap text-sm leading-6 text-slate-300">
-                                                    {aiSummary}
+                                                <span className="text-xs font-semibold text-sky-400">
+                                                    AI Summary
+                                                </span>
 
-                                                    {isSummarizingUnread && (
-                                                        <span className="ml-1 animate-pulse">
-                                                            ▌
-                                                        </span>
-                                                    )}
-                                                </p>
+                                                {isSummarizingUnread && (
+                                                    <span className="text-[11px] text-muted-foreground">
+                                                        Summarizing...
+                                                    </span>
+                                                )}
                                             </div>
-                                        )}
-                                    </div>
-                                )}
 
-                            <MessageBubble
-                                message={message}
-                                onReply={onReply}
-                                isOwnMessage={
-                                    message.sender.id ===
-                                    currentUser?.user.id
-                                }
-                                isLastOwnMessage={
-                                    message.id ===
-                                    lastOwnMessage?.id
-                                }
-                                lastReadAt={
-                                    lastReadAt
-                                }
-                                isHighlighted={
-                                    highlightedMessageId ===
-                                    message.id
-                                }
-                            />
+                                            <div className="text-sm leading-6 text-foreground/85 whitespace-pre-wrap">
+                                                {aiSummary}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            <div
+                                id={`message-${message.id}`}
+                            >
+                                <MessageBubble
+                                    message={message}
+                                    onReply={
+                                        onReply
+                                    }
+                                    isOwnMessage={
+                                        message.sender.id ===
+                                        currentUser?.user.id
+                                    }
+                                    isLastOwnMessage={
+                                        message.id ===
+                                        lastOwnMessage?.id
+                                    }
+                                    lastReadAt={
+                                        lastReadAt
+                                    }
+                                    isHighlighted={
+                                        highlightedMessageId ===
+                                        message.id
+                                    }
+                                />
+                            </div>
                         </div>
                     );
                 }
