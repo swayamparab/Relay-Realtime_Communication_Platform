@@ -1133,90 +1133,84 @@ export default function MessageList({
                             {shouldShowUnreadSummary && (
                                 <div
                                     id="unread-summary-anchor"
-                                    className="
-                                        my-1
-                                        w-full
-                                        scroll-mt-3
-                                    "
+                                    className="my-1 w-full scroll-mt-3"
                                 >
                                     {/* Unread divider + AI action */}
-                                    {!aiSummary && (
-                                        <div className="flex items-center gap-3">
-                                            <div className="h-px flex-1 bg-sky-500/20" />
+                                    <div className="flex items-center gap-3">
+                                        <div className="h-px flex-1 bg-sky-500/20" />
 
-                                            <span
-                                                className="
-                                                    shrink-0
-                                                    text-xs
-                                                    font-medium
-                                                    text-sky-400
-                                                "
-                                            >
-                                                {initialUnreadCountRef.current} new messages
-                                            </span>
+                                        <span
+                                            className="
+                                                shrink-0
+                                                text-xs
+                                                font-medium
+                                                text-sky-400
+                                            "
+                                        >
+                                            {initialUnreadCountRef.current} new messages
+                                        </span>
 
-                                            <button
-                                                type="button"
-                                                disabled={isSummarizingUnread}
-                                                onClick={() => {
-                                                    if (
-                                                        isSummarizingUnread ||
-                                                        !firstUnreadMessage
-                                                    ) {
-                                                        return;
-                                                    }
+                                        <button
+                                            type="button"
+                                            disabled={isSummarizingUnread}
+                                            onClick={() => {
+                                                if (
+                                                    isSummarizingUnread ||
+                                                    !firstUnreadMessage
+                                                ) {
+                                                    return;
+                                                }
 
-                                                    const unreadSince =
+                                                const unreadSince =
+                                                    new Date(
                                                         new Date(
-                                                            new Date(
-                                                                firstUnreadMessage.createdAt
-                                                            ).getTime() - 1
-                                                        ).toISOString();
+                                                            firstUnreadMessage.createdAt
+                                                        ).getTime() - 1
+                                                    ).toISOString();
 
-                                                    setAiSummary("");
+                                                setAiSummary("");
 
-                                                    summarizeUnread({
-                                                        conversationId,
-                                                        unreadSince,
-                                                        onChunk: (chunk) => {
-                                                            setAiSummary(
-                                                                (previous) =>
-                                                                    previous + chunk
-                                                            );
-                                                        },
-                                                    });
-                                                }}
-                                                className="
-                                                    flex
-                                                    shrink-0
-                                                    items-center
-                                                    gap-1.5
-                                                    rounded-lg
-                                                    border
-                                                    border-sky-500/20
-                                                    bg-sky-500/5
-                                                    px-2.5
-                                                    py-1.5
-                                                    text-xs
-                                                    font-medium
-                                                    text-sky-400
-                                                    transition
-                                                    hover:border-sky-500/40
-                                                    hover:bg-sky-500/10
-                                                    disabled:cursor-not-allowed
-                                                    disabled:opacity-40
-                                                "
-                                            >
-                                                <Sparkles className="h-3.5 w-3.5" />
+                                                summarizeUnread({
+                                                    conversationId,
+                                                    unreadSince,
+                                                    onChunk: (chunk) => {
+                                                        setAiSummary(
+                                                            (previous) =>
+                                                                previous + chunk
+                                                        );
+                                                    },
+                                                });
+                                            }}
+                                            className="
+                                                flex
+                                                shrink-0
+                                                items-center
+                                                gap-1.5
+                                                rounded-lg
+                                                border
+                                                border-sky-500/20
+                                                bg-sky-500/5
+                                                px-2.5
+                                                py-1.5
+                                                text-xs
+                                                font-medium
+                                                text-sky-400
+                                                transition
+                                                hover:border-sky-500/40
+                                                hover:bg-sky-500/10
+                                                disabled:cursor-not-allowed
+                                                disabled:opacity-40
+                                            "
+                                        >
+                                            <Sparkles className="h-3.5 w-3.5" />
 
-                                                {isSummarizingUnread
-                                                    ? "Summarizing..."
-                                                    : "Summarize with AI"}
-                                            </button>
+                                            {isSummarizingUnread
+                                                ? "Summarizing..."
+                                                : "Summarize with AI"}
+                                        </button>
 
-                                            <div className="h-px flex-1 bg-sky-500/20" />
-                                        </div>
-                                    )}
+                                        <div className="h-px flex-1 bg-sky-500/20" />
+                                    </div>
 
                                     {/* AI Summary */}
                                     {aiSummary && (
@@ -1237,7 +1231,7 @@ export default function MessageList({
                                                 )}
                                             </div>
 
-                                            <div className="text-sm leading-6 text-foreground/85 whitespace-pre-wrap">
+                                            <div className="whitespace-pre-wrap text-sm leading-6 text-foreground/85">
                                                 {aiSummary}
                                             </div>
                                         </div>
