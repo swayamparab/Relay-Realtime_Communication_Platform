@@ -158,14 +158,11 @@ export default function MessageList({
             ) ?? [];
 
     /*
-     * Live lastReadAt.
-     *
-     * This is intentionally used only for
-     * MessageBubble/read receipts.
-     *
-     * The unread-summary feature uses the
-     * frozen initialLastReadAtRef instead.
+     * ============================================================
+     * LIVE READ STATE
+     * ============================================================
      */
+
     const lastReadAt =
         data?.pages[0]
             ?.lastReadAt ?? null;
@@ -196,24 +193,32 @@ export default function MessageList({
 
     /*
      * ============================================================
-     * UNREAD SNAPSHOT
+     * INITIAL UNREAD SNAPSHOT
      * ============================================================
      *
-     * These values represent the state when the conversation
-     * was opened.
+     * IMPORTANT:
      *
-     * They MUST NOT change after markConversationAsRead().
+     * These are STATE rather than refs because we need React
+     * to render the unread summary/button after the snapshot
+     * has been captured.
+     *
+     * Once captured, these values never change during this
+     * conversation session.
      */
 
-    const initialUnreadCountRef =
-        useRef<number | null>(
-            null
-        );
+    const [
+        initialUnreadCount,
+        setInitialUnreadCount,
+    ] = useState<
+        number | null
+    >(null);
 
-    const initialLastReadAtRef =
-        useRef<string | null>(
-            null
-        );
+    const [
+        initialLastReadAt,
+        setInitialLastReadAt,
+    ] = useState<
+        string | null
+    >(null);
 
     const unreadSnapshotCapturedRef =
         useRef(false);
@@ -275,17 +280,14 @@ export default function MessageList({
         wasNearBottomRef.current =
             false;
 
-        initialUnreadCountRef.current =
-            null;
-
-        initialLastReadAtRef.current =
-            null;
-
         unreadSnapshotCapturedRef.current =
             false;
 
         firstUnreadMessageIdRef.current =
             null;
+
+        setInitialUnreadCount(null);
+        setInitialLastReadAt(null);
 
         setAiSummary("");
     }, [conversationId]);
@@ -295,11 +297,10 @@ export default function MessageList({
      * CAPTURE ORIGINAL UNREAD STATE
      * ============================================================
      *
-     * This effect appears BEFORE the mark-as-read effect below.
+     * This runs before mark-as-read.
      *
-     * React runs effects in declaration order, so when both
-     * pieces of data are available, the original unread state
-     * is frozen before markConversationAsRead() can update it.
+     * We freeze the unread state that existed when the chat
+     * was opened.
      */
 
     useEffect(() => {
@@ -320,10 +321,6 @@ export default function MessageList({
                     conversationId
             );
 
-        /*
-         * Wait until both the conversation and
-         * message response are available.
-         */
         if (
             !conversation ||
             !data
@@ -331,20 +328,16 @@ export default function MessageList({
             return;
         }
 
-        initialUnreadCountRef.current =
-            conversation.unreadCount;
-
-        /*
-         * This is the original lastReadAt from
-         * the initial message response.
-         *
-         * It is allowed to be null.
-         */
-        initialLastReadAtRef.current =
-            lastReadAt;
-
         unreadSnapshotCapturedRef.current =
             true;
+
+        setInitialUnreadCount(
+            conversation.unreadCount
+        );
+
+        setInitialLastReadAt(
+            lastReadAt
+        );
     }, [
         conversationId,
         conversationsData,
@@ -422,16 +415,23 @@ export default function MessageList({
      * ============================================================
      * FIND FIRST UNREAD MESSAGE
      * ============================================================
+     *
+     * IMPORTANT:
+     *
+     * This works for ANY unread count.
+     *
+     * 1 unread  -> first unread
+     * 2 unread  -> first unread
+     * 3 unread  -> first unread
+     * 4 unread  -> first unread
+     * 5+ unread -> first unread
      */
 
     const getFirstUnreadMessage =
         useCallback((): Message | null => {
-            const unreadCount =
-                initialUnreadCountRef.current;
-
             if (
-                unreadCount === null ||
-                unreadCount < 5 ||
+                initialUnreadCount === null ||
+                initialUnreadCount <= 0 ||
                 messages.length === 0
             ) {
                 return null;
@@ -440,18 +440,13 @@ export default function MessageList({
             /*
              * Best case:
              *
-             * Use the ORIGINAL lastReadAt.
-             *
-             * Do not use the live lastReadAt because
-             * it may already have been changed to now.
+             * Use the frozen lastReadAt from when the
+             * conversation was opened.
              */
-            const originalLastReadAt =
-                initialLastReadAtRef.current;
-
-            if (originalLastReadAt) {
+            if (initialLastReadAt) {
                 const readTime =
                     new Date(
-                        originalLastReadAt
+                        initialLastReadAt
                     ).getTime();
 
                 const firstUnread =
@@ -469,14 +464,17 @@ export default function MessageList({
             }
 
             /*
+             * Fallback:
+             *
              * If there was no previous lastReadAt,
-             * use the initial unread count.
+             * calculate the first unread message from
+             * the original unread count.
              */
             const firstUnreadIndex =
                 Math.max(
                     0,
                     messages.length -
-                    unreadCount
+                    initialUnreadCount
                 );
 
             return (
@@ -484,7 +482,11 @@ export default function MessageList({
                 firstUnreadIndex
                 ] ?? null
             );
-        }, [messages]);
+        }, [
+            messages,
+            initialUnreadCount,
+            initialLastReadAt,
+        ]);
 
     /*
      * ============================================================
@@ -532,13 +534,18 @@ export default function MessageList({
      * INITIAL SCROLL
      * ============================================================
      *
-     * If 5+ messages were unread:
+     * IMPORTANT BEHAVIOR:
      *
-     *      [Unread divider]
-     *      [AI summary button]
-     *      [First unread message]
+     * 0 unread:
+     *     -> latest message
      *
-     * The summary block is used as the actual scroll anchor.
+     * 1-4 unread:
+     *     -> FIRST unread message
+     *
+     * 5+ unread:
+     *     -> SUMMARY BUTTON / FIRST unread area
+     *
+     * NEVER scroll to the bottom when unread messages exist.
      */
 
     useEffect(() => {
@@ -559,8 +566,7 @@ export default function MessageList({
         }
 
         if (
-            initialUnreadCountRef.current ===
-            null
+            initialUnreadCount === null
         ) {
             return;
         }
@@ -580,38 +586,50 @@ export default function MessageList({
                     return;
                 }
 
-                const unreadCount =
-                    initialUnreadCountRef.current ??
-                    0;
+                /*
+                 * ====================================================
+                 * ANY UNREAD MESSAGES
+                 * ====================================================
+                 */
 
                 if (
-                    unreadCount >= 5
+                    initialUnreadCount > 0
                 ) {
                     const firstUnread =
                         getFirstUnreadMessage();
 
-                    if (firstUnread) {
-                        firstUnreadMessageIdRef.current =
-                            firstUnread.id;
+                    /*
+                     * We have unread messages but haven't loaded
+                     * the first unread message yet.
+                     *
+                     * DO NOT scroll to bottom.
+                     */
+                    if (!firstUnread) {
+                        return;
+                    }
 
-                        const anchor =
+                    firstUnreadMessageIdRef.current =
+                        firstUnread.id;
+
+                    /*
+                     * For 5+ unread, try to position at the
+                     * summary/button which is rendered directly
+                     * before the first unread message.
+                     */
+                    if (
+                        initialUnreadCount >= 5
+                    ) {
+                        const summaryAnchor =
                             document.getElementById(
                                 "unread-summary-anchor"
                             );
 
-                        if (anchor) {
-                            /*
-                             * Calculate position relative to
-                             * the message container.
-                             *
-                             * This avoids scrollIntoView()
-                             * moving the wrong ancestor.
-                             */
+                        if (summaryAnchor) {
                             const containerRect =
                                 container.getBoundingClientRect();
 
                             const anchorRect =
-                                anchor.getBoundingClientRect();
+                                summaryAnchor.getBoundingClientRect();
 
                             const targetScrollTop =
                                 container.scrollTop +
@@ -641,11 +659,66 @@ export default function MessageList({
                             return;
                         }
                     }
+
+                    /*
+                     * =================================================
+                     * 1-4 UNREAD
+                     * =================================================
+                     *
+                     * No AI summary.
+                     *
+                     * Simply open at the FIRST unread message.
+                     */
+                    const firstUnreadElement =
+                        document.getElementById(
+                            `message-${firstUnread.id}`
+                        );
+
+                    if (!firstUnreadElement) {
+                        return;
+                    }
+
+                    const containerRect =
+                        container.getBoundingClientRect();
+
+                    const messageRect =
+                        firstUnreadElement.getBoundingClientRect();
+
+                    const targetScrollTop =
+                        container.scrollTop +
+                        (
+                            messageRect.top -
+                            containerRect.top
+                        ) -
+                        12;
+
+                    container.scrollTo({
+                        top: Math.max(
+                            0,
+                            targetScrollTop
+                        ),
+                        behavior: "auto",
+                    });
+
+                    initialScrollDoneRef.current =
+                        true;
+
+                    previousMessageCountRef.current =
+                        messages.length;
+
+                    wasNearBottomRef.current =
+                        false;
+
+                    return;
                 }
 
                 /*
-                 * Normal conversation:
-                 * open at the latest message.
+                 * ====================================================
+                 * NO UNREAD MESSAGES
+                 * ====================================================
+                 *
+                 * Normal behavior:
+                 * open at latest message.
                  */
                 container.scrollTo({
                     top:
@@ -661,7 +734,7 @@ export default function MessageList({
 
                 wasNearBottomRef.current =
                     true;
-            }, 0);
+            }, 50);
 
         return () => {
             clearTimeout(timeoutId);
@@ -669,6 +742,8 @@ export default function MessageList({
     }, [
         data,
         messages.length,
+        initialUnreadCount,
+        initialLastReadAt,
         getFirstUnreadMessage,
     ]);
 
@@ -691,7 +766,10 @@ export default function MessageList({
         const container =
             containerRef.current;
 
-        if (!anchor || !container) {
+        if (
+            !anchor ||
+            !container
+        ) {
             paginationPendingRef.current =
                 false;
 
@@ -746,8 +824,7 @@ export default function MessageList({
             messages.length;
 
         /*
-         * Ignore the count increase caused by
-         * loading older messages.
+         * Ignore count changes caused by loading older messages.
          */
         if (
             skipNextMessageScrollRef.current
@@ -762,8 +839,8 @@ export default function MessageList({
         }
 
         /*
-         * Only scroll to bottom for a genuinely new
-         * message when the user was already near bottom.
+         * Only scroll to bottom when a genuinely new message
+         * arrives AND the user was already near the bottom.
          */
         if (
             currentCount >
@@ -1034,16 +1111,9 @@ export default function MessageList({
         getFirstUnreadMessage();
 
     /*
-     * Keep the ref synchronized with the
-     * currently resolved first unread message.
+     * Keep ref synchronized.
      */
-    if (
-        firstUnreadMessage &&
-        (
-            initialUnreadCountRef.current ??
-            0
-        ) >= 5
-    ) {
+    if (firstUnreadMessage) {
         firstUnreadMessageIdRef.current =
             firstUnreadMessage.id;
     }
@@ -1107,7 +1177,7 @@ export default function MessageList({
                     const shouldShowUnreadSummary =
                         isFirstUnread &&
                         (
-                            initialUnreadCountRef.current ??
+                            initialUnreadCount ??
                             0
                         ) >= 5;
 
@@ -1147,12 +1217,14 @@ export default function MessageList({
                                                 text-sky-400
                                             "
                                         >
-                                            {initialUnreadCountRef.current} new messages
+                                            {initialUnreadCount} new messages
                                         </span>
 
                                         <button
                                             type="button"
-                                            disabled={isSummarizingUnread}
+                                            disabled={
+                                                isSummarizingUnread
+                                            }
                                             onClick={() => {
                                                 if (
                                                     isSummarizingUnread ||
@@ -1165,7 +1237,8 @@ export default function MessageList({
                                                     new Date(
                                                         new Date(
                                                             firstUnreadMessage.createdAt
-                                                        ).getTime() - 1
+                                                        ).getTime() -
+                                                        1
                                                     ).toISOString();
 
                                                 setAiSummary("");
@@ -1173,12 +1246,18 @@ export default function MessageList({
                                                 summarizeUnread({
                                                     conversationId,
                                                     unreadSince,
-                                                    onChunk: (chunk) => {
-                                                        setAiSummary(
-                                                            (previous) =>
-                                                                previous + chunk
-                                                        );
-                                                    },
+                                                    onChunk:
+                                                        (
+                                                            chunk
+                                                        ) => {
+                                                            setAiSummary(
+                                                                (
+                                                                    previous
+                                                                ) =>
+                                                                    previous +
+                                                                    chunk
+                                                            );
+                                                        },
                                                 });
                                             }}
                                             className="
@@ -1187,19 +1266,16 @@ export default function MessageList({
                                                 items-center
                                                 gap-1.5
                                                 rounded-lg
-                                                border
-                                                border-sky-500/20
-                                                bg-sky-500/5
-                                                px-2.5
+                                                bg-sky-500
+                                                px-3
                                                 py-1.5
                                                 text-xs
                                                 font-medium
-                                                text-sky-400
+                                                text-white
                                                 transition
-                                                hover:border-sky-500/40
-                                                hover:bg-sky-500/10
+                                                hover:bg-sky-600
                                                 disabled:cursor-not-allowed
-                                                disabled:opacity-40
+                                                disabled:opacity-50
                                             "
                                         >
                                             <Sparkles className="h-3.5 w-3.5" />
@@ -1231,7 +1307,7 @@ export default function MessageList({
                                                 )}
                                             </div>
 
-                                            <div className="whitespace-pre-wrap text-sm leading-6 text-foreground/85">
+                                            <div className="whitespace-pre-wrap text-sm leading-6 text-white">
                                                 {aiSummary}
                                             </div>
                                         </div>
