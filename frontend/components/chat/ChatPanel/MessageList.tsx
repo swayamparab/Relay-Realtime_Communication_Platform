@@ -11,6 +11,7 @@ import { useParams } from "next/navigation";
 
 import { useMessages } from "@/hooks/message/useMessages";
 import { useCurrentUser } from "@/hooks/user/useCurrentUser";
+import { useConversations } from "@/hooks/conversation/useConversations";
 
 import MessageBubble from "./MessageBubble";
 
@@ -146,6 +147,21 @@ export default function MessageList({
 
     /*
      * ============================================================
+     * CONVERSATIONS
+     * ============================================================
+     *
+     * IMPORTANT:
+     *
+     * conversation.unreadCount is the source of truth for
+     * determining whether 5+ messages were unread.
+     */
+
+    const {
+        data: conversationsData,
+    } = useConversations();
+
+    /*
+     * ============================================================
      * MESSAGES
      * ============================================================
      */
@@ -218,36 +234,29 @@ export default function MessageList({
 
     /*
      * ============================================================
-     * INITIAL UNREAD SNAPSHOT
+     * ORIGINAL UNREAD SNAPSHOT
      * ============================================================
      *
-     * These values represent the unread state when the
-     * conversation was opened.
-     *
-     * They must NOT change after mark-as-read runs.
+     * These values MUST NOT change after mark-as-read.
      */
 
-    const [
-        initialUnreadCount,
-        setInitialUnreadCount,
-    ] = useState<
-        number | null
-    >(null);
+    const initialUnreadCountRef =
+        useRef<number | null>(
+            null
+        );
 
-    const [
-        initialLastReadAt,
-        setInitialLastReadAt,
-    ] = useState<
-        string | null
-    >(null);
-
-    const unreadSnapshotCapturedRef =
-        useRef(false);
-
-    const firstUnreadMessageIdRef =
+    const initialLastReadAtRef =
         useRef<string | null>(
             null
         );
+
+    const firstUnreadMessageRef =
+        useRef<string | null>(
+            null
+        );
+
+    const unreadSnapshotCapturedRef =
+        useRef(false);
 
     /*
      * ============================================================
@@ -301,14 +310,17 @@ export default function MessageList({
         wasNearBottomRef.current =
             false;
 
-        unreadSnapshotCapturedRef.current =
-            false;
-
-        firstUnreadMessageIdRef.current =
+        initialUnreadCountRef.current =
             null;
 
-        setInitialUnreadCount(null);
-        setInitialLastReadAt(null);
+        initialLastReadAtRef.current =
+            null;
+
+        firstUnreadMessageRef.current =
+            null;
+
+        unreadSnapshotCapturedRef.current =
+            false;
 
         setAiSummary("");
     }, [conversationId]);
@@ -318,48 +330,61 @@ export default function MessageList({
      * CAPTURE ORIGINAL UNREAD STATE
      * ============================================================
      *
-     * IMPORTANT:
+     * This is the important part restored from the working
+     * version.
      *
-     * We use the messages API as the source of truth.
+     * We get unreadCount from conversationsData BEFORE
+     * markConversationAsRead() changes it to 0.
      *
-     * lastReadAt tells us where the user's read boundary was
-     * when the messages were fetched.
-     *
-     * We capture this ONCE before mark-as-read changes anything.
+     * We get lastReadAt from the initial messages response.
      */
 
     useEffect(() => {
-        if (!conversationId || !data) {
+        if (!conversationId) {
             return;
         }
 
-        if (unreadSnapshotCapturedRef.current) {
+        if (
+            unreadSnapshotCapturedRef.current
+        ) {
             return;
         }
 
-        const originalLastReadAt =
-            data.pages[0]?.lastReadAt ?? null;
+        const conversation =
+            conversationsData?.conversations.find(
+                (conversation) =>
+                    conversation.conversationId ===
+                    conversationId
+            );
 
-        const readTime = originalLastReadAt
-            ? new Date(originalLastReadAt).getTime()
-            : 0;
+        /*
+         * Wait until both conversation and messages
+         * are available.
+         */
+        if (!conversation || !data) {
+            return;
+        }
 
-        const unreadMessages = messages.filter(
-            (message) =>
-                new Date(message.createdAt).getTime() >
-                readTime
-        );
+        /*
+         * Freeze the ORIGINAL unread count.
+         */
+        initialUnreadCountRef.current =
+            conversation.unreadCount;
 
-        // Freeze the original unread state.
-        unreadSnapshotCapturedRef.current = true;
+        /*
+         * Freeze the ORIGINAL lastReadAt.
+         */
+        initialLastReadAtRef.current =
+            lastReadAt;
 
-        setInitialLastReadAt(originalLastReadAt);
-        setInitialUnreadCount(unreadMessages.length);
-
-        // IMPORTANT: remember the first unread message.
-        firstUnreadMessageIdRef.current =
-            unreadMessages[0]?.id ?? null;
-    }, [conversationId, data, messages]);
+        unreadSnapshotCapturedRef.current =
+            true;
+    }, [
+        conversationId,
+        conversationsData,
+        data,
+        lastReadAt,
+    ]);
 
     /*
      * ============================================================
@@ -436,19 +461,71 @@ export default function MessageList({
 
     const getFirstUnreadMessage =
         useCallback((): Message | null => {
-            const firstUnreadId =
-                firstUnreadMessageIdRef.current;
+            const unreadCount =
+                initialUnreadCountRef.current;
 
-            if (!firstUnreadId) {
+            if (
+                unreadCount === null ||
+                unreadCount < 5 ||
+                messages.length === 0
+            ) {
                 return null;
             }
 
-            return (
-                messages.find(
-                    (message) =>
-                        message.id === firstUnreadId
-                ) ?? null
-            );
+            const originalLastReadAt =
+                initialLastReadAtRef.current;
+
+            /*
+             * Best case:
+             * use the ORIGINAL lastReadAt.
+             *
+             * Never use live lastReadAt here because it may
+             * already have been updated by mark-as-read.
+             */
+            if (originalLastReadAt) {
+                const readTime =
+                    new Date(
+                        originalLastReadAt
+                    ).getTime();
+
+                const firstUnread =
+                    messages.find(
+                        (message) =>
+                            new Date(
+                                message.createdAt
+                            ).getTime() >
+                            readTime
+                    );
+
+                if (firstUnread) {
+                    firstUnreadMessageRef.current =
+                        firstUnread.id;
+
+                    return firstUnread;
+                }
+            }
+
+            /*
+             * Fallback when there is no lastReadAt.
+             */
+            const firstUnreadIndex =
+                Math.max(
+                    0,
+                    messages.length -
+                    unreadCount
+                );
+
+            const firstUnread =
+                messages[
+                firstUnreadIndex
+                ] ?? null;
+
+            if (firstUnread) {
+                firstUnreadMessageRef.current =
+                    firstUnread.id;
+            }
+
+            return firstUnread;
         }, [messages]);
 
     /*
@@ -496,15 +573,6 @@ export default function MessageList({
      * ============================================================
      * INITIAL SCROLL
      * ============================================================
-     *
-     * 0 unread:
-     *     -> latest message
-     *
-     * 1-4 unread:
-     *     -> first unread
-     *
-     * 5+ unread:
-     *     -> AI summary / first unread
      */
 
     useEffect(() => {
@@ -524,9 +592,10 @@ export default function MessageList({
             return;
         }
 
-        if (
-            initialUnreadCount === null
-        ) {
+        const unreadCount =
+            initialUnreadCountRef.current;
+
+        if (unreadCount === null) {
             return;
         }
 
@@ -551,22 +620,19 @@ export default function MessageList({
                  * ====================================================
                  */
 
-                if (
-                    initialUnreadCount > 0
-                ) {
+                if (unreadCount > 0) {
                     const firstUnread =
                         getFirstUnreadMessage();
 
                     /*
-                     * First unread isn't loaded yet.
-                     *
+                     * First unread is not loaded yet.
                      * Never scroll to bottom.
                      */
                     if (!firstUnread) {
                         return;
                     }
 
-                    firstUnreadMessageIdRef.current =
+                    firstUnreadMessageRef.current =
                         firstUnread.id;
 
                     /*
@@ -574,9 +640,7 @@ export default function MessageList({
                      *
                      * Position at the AI summary area.
                      */
-                    if (
-                        initialUnreadCount >= 5
-                    ) {
+                    if (unreadCount >= 5) {
                         const summaryAnchor =
                             document.getElementById(
                                 "unread-summary-anchor"
@@ -623,8 +687,7 @@ export default function MessageList({
 
                     /*
                      * 1-4 unread:
-                     *
-                     * Position at the first unread message.
+                     * position at first unread.
                      */
                     const firstUnreadElement =
                         document.getElementById(
@@ -698,9 +761,8 @@ export default function MessageList({
         };
     }, [
         data,
+        conversationId,
         messages.length,
-        initialUnreadCount,
-        initialLastReadAt,
         getFirstUnreadMessage,
     ]);
 
@@ -848,8 +910,8 @@ export default function MessageList({
         /*
          * IMPORTANT:
          *
-         * Do not mark the conversation as read until the
-         * original unread snapshot has been captured.
+         * Do not mark as read until the original
+         * unread snapshot has been captured.
          */
         if (
             !unreadSnapshotCapturedRef.current
@@ -1080,7 +1142,7 @@ export default function MessageList({
 
     const firstUnreadMessage =
         getFirstUnreadMessage();
-        
+
     /*
      * ============================================================
      * RENDER
@@ -1138,13 +1200,15 @@ export default function MessageList({
                         message.id;
 
                     /*
-                     * AI summary is shown exactly once:
-                     * immediately before the first unread message.
+                     * IMPORTANT:
+                     *
+                     * The AI summary button is controlled by
+                     * the ORIGINAL conversation unread count.
                      */
                     const shouldShowUnreadSummary =
                         isFirstUnread &&
                         (
-                            initialUnreadCount ??
+                            initialUnreadCountRef.current ??
                             0
                         ) >= 5;
 
@@ -1188,7 +1252,9 @@ export default function MessageList({
                                                 text-sky-400
                                             "
                                         >
-                                            {initialUnreadCount}{" "}
+                                            {
+                                                initialUnreadCountRef.current
+                                            }{" "}
                                             new messages
                                         </span>
 
