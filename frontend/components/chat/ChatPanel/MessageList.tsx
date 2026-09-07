@@ -211,6 +211,9 @@ export default function MessageList({
     const unreadSnapshotCapturedRef =
         useRef(false);
 
+    const snapshotConversationIdRef =
+        useRef<string | null>(null);
+
     const initialScrollDoneRef =
         useRef(false);
 
@@ -251,20 +254,9 @@ export default function MessageList({
         wasNearBottomRef.current =
             false;
 
-        initialUnreadCountRef.current =
-            null;
-
-        initialLastReadAtRef.current =
-            null;
-
         firstUnreadMessageRef.current =
             null;
 
-        unreadSnapshotCapturedRef.current =
-            false;
-
-        setInitialUnreadCount(null);
-        setUnreadSnapshotReady(false);
         setAiSummary("");
     }, [conversationId]);
 
@@ -274,7 +266,8 @@ export default function MessageList({
         }
 
         if (
-            unreadSnapshotCapturedRef.current
+            snapshotConversationIdRef.current ===
+            conversationId
         ) {
             return;
         }
@@ -290,20 +283,23 @@ export default function MessageList({
             return;
         }
 
+        snapshotConversationIdRef.current =
+            conversationId;
+
         initialUnreadCountRef.current =
             conversation.unreadCount;
 
         initialLastReadAtRef.current =
             lastReadAt;
 
+        unreadSnapshotCapturedRef.current =
+            true;
+
         setInitialUnreadCount(
             conversation.unreadCount
         );
 
         setUnreadSnapshotReady(true);
-
-        unreadSnapshotCapturedRef.current =
-            true;
     }, [
         conversationId,
         conversationsData,
