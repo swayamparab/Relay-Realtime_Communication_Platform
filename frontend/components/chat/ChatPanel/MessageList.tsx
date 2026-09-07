@@ -133,6 +133,11 @@ export default function MessageList({
         setInitialUnreadCount,
     ] = useState<number | null>(null);
 
+    const [
+        unreadSnapshotReady,
+        setUnreadSnapshotReady,
+    ] = useState(false);
+
     const {
         data: currentUser,
     } = useCurrentUser();
@@ -188,7 +193,6 @@ export default function MessageList({
             null
         );
 
-    // Keep the original unread state.
     const initialUnreadCountRef =
         useRef<number | null>(
             null
@@ -260,10 +264,10 @@ export default function MessageList({
             false;
 
         setInitialUnreadCount(null);
+        setUnreadSnapshotReady(false);
         setAiSummary("");
     }, [conversationId]);
 
-    // Capture unread state before it is marked as read.
     useEffect(() => {
         if (!conversationId) {
             return;
@@ -295,6 +299,8 @@ export default function MessageList({
         setInitialUnreadCount(
             conversation.unreadCount
         );
+
+        setUnreadSnapshotReady(true);
 
         unreadSnapshotCapturedRef.current =
             true;
@@ -460,7 +466,6 @@ export default function MessageList({
         }
     }
 
-    // Set the initial scroll position.
     useEffect(() => {
         if (!data) {
             return;
@@ -626,7 +631,6 @@ export default function MessageList({
         getFirstUnreadMessage,
     ]);
 
-    // Restore position after loading older messages.
     useLayoutEffect(() => {
         if (
             !paginationPendingRef.current
@@ -680,7 +684,6 @@ export default function MessageList({
             messages.length;
     }, [messages.length]);
 
-    // Scroll when a new message arrives.
     useEffect(() => {
         if (!data) {
             return;
@@ -732,7 +735,6 @@ export default function MessageList({
     const lastMessage =
         messages.at(-1);
 
-    // Mark the conversation as read.
     useEffect(() => {
         if (
             !isConnected ||
@@ -767,7 +769,6 @@ export default function MessageList({
         markConversationAsRead,
     ]);
 
-    // Keep the bottom position after media loads.
     useEffect(() => {
         function handleImageLoaded() {
             const container =
@@ -810,7 +811,6 @@ export default function MessageList({
         };
     }, [isNearBottom]);
 
-    // Jump to a searched message.
     useEffect(() => {
         if (!jumpToMessageId) {
             return;
@@ -934,7 +934,9 @@ export default function MessageList({
         initialUnreadCount ?? 0;
 
     const showUnreadSummary =
-        unreadCount >= 5;
+        unreadSnapshotReady &&
+        unreadCount >= 5 &&
+        !!firstUnreadMessage;
 
     return (
         <div
