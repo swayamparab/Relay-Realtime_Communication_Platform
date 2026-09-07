@@ -128,6 +128,11 @@ export default function MessageList({
     const [aiSummary, setAiSummary] =
         useState("");
 
+    const [
+        initialUnreadCount,
+        setInitialUnreadCount,
+    ] = useState<number | null>(null);
+
     const {
         data: currentUser,
     } = useCurrentUser();
@@ -254,6 +259,7 @@ export default function MessageList({
         unreadSnapshotCapturedRef.current =
             false;
 
+        setInitialUnreadCount(null);
         setAiSummary("");
     }, [conversationId]);
 
@@ -285,6 +291,10 @@ export default function MessageList({
 
         initialLastReadAtRef.current =
             lastReadAt;
+
+        setInitialUnreadCount(
+            conversation.unreadCount
+        );
 
         unreadSnapshotCapturedRef.current =
             true;
@@ -921,11 +931,10 @@ export default function MessageList({
         getFirstUnreadMessage();
 
     const unreadCount =
-        initialUnreadCountRef.current ?? 0;
+        initialUnreadCount ?? 0;
 
     const showUnreadSummary =
-        unreadCount >= 5 &&
-        !!firstUnreadMessage;
+        unreadCount >= 5;
 
     return (
         <div
@@ -951,18 +960,20 @@ export default function MessageList({
                 <div
                     className="
                         pointer-events-none
-                        sticky
-                        top-0
+                        absolute
+                        left-0
+                        right-0
+                        top-3
                         z-30
                         flex
                         justify-center
-                        pb-1
                     "
                 >
                     <button
                         type="button"
                         disabled={
-                            isSummarizingUnread
+                            isSummarizingUnread ||
+                            !firstUnreadMessage
                         }
                         onClick={() => {
                             if (
@@ -1001,17 +1012,18 @@ export default function MessageList({
                             pointer-events-auto
                             flex
                             items-center
-                            gap-3
+                            gap-2.5
                             rounded-full
                             border
-                            border-slate-300
+                            border-slate-300/80
                             bg-white
                             px-5
-                            py-3
+                            py-2.5
                             text-sm
                             font-semibold
                             text-slate-950
                             shadow-[0_4px_18px_rgba(0,0,0,0.35)]
+                            backdrop-blur-sm
                             transition
                             hover:bg-slate-100
                             disabled:cursor-not-allowed
