@@ -254,23 +254,9 @@ export default function MessageList({
         wasNearBottomRef.current =
             false;
 
-        initialUnreadCountRef.current =
-            null;
-
-        initialLastReadAtRef.current =
-            null;
-
         firstUnreadMessageRef.current =
             null;
 
-        unreadSnapshotCapturedRef.current =
-            false;
-
-        snapshotConversationIdRef.current =
-            null;
-
-        setInitialUnreadCount(null);
-        setUnreadSnapshotReady(false);
         setAiSummary("");
     }, [conversationId]);
 
@@ -1039,8 +1025,11 @@ export default function MessageList({
                 ref={containerRef}
                 onScroll={handleScroll}
                 className="
+                    flex
                     h-full
                     min-h-0
+                    flex-col
+                    gap-3
                     overflow-x-hidden
                     overflow-y-auto
                     bg-gradient-to-b
